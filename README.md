@@ -56,10 +56,25 @@ También se pueden instalar varias:
 qa-skills install cypress frontend gitflow
 ```
 
-Las skills se copian al proyecto consumidor dentro de:
+Cada instalación copia automáticamente las carpetas base desde el
+repositorio central:
+
+```text
+.agents/agents/
+.agents/instructions/
+```
+
+por lo que el proyecto siempre tiene el agente de QA y las instrucciones
+generales. Las skills se copian dentro de:
 
 ```text
 .agents/skills/
+```
+
+Si no se quieren las carpetas base:
+
+```bash
+qa-skills install cypress --no-base
 ```
 
 Funciona en cualquier tipo de proyecto (Cypress/Node, Java, mobile, etc.),
@@ -95,7 +110,9 @@ agente.
 qa-skills update
 ```
 
-Actualiza solamente las skills que ya existen localmente.
+Actualiza solamente las skills que ya existen localmente, y refresca las
+carpetas base (`agents` e `instructions`). Con `--no-base` se omite el
+refrescado de las carpetas base.
 
 Si el repositorio central tiene una skill nueva, `update` NO la instala.
 
