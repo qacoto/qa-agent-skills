@@ -41,11 +41,26 @@ function commitAll(repoRoot, message) {
   );
 }
 
+function writeBase(repoRoot) {
+  const agentFile = path.join(repoRoot, ".agents", "agents", "qa-engineer", "AGENT.md");
+  fs.mkdirSync(path.dirname(agentFile), { recursive: true });
+  fs.writeFileSync(agentFile, "# QA Engineer\n\nAgente base.");
+
+  const instructionsDir = path.join(repoRoot, ".agents", "instructions");
+  fs.mkdirSync(instructionsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(instructionsDir, "general.md"),
+    "# General\n\n- Regla base."
+  );
+}
+
 function makeSkillRepo(t) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "qa-skills-fixture-"));
   fs.mkdirSync(path.join(repoRoot, ".agents"), { recursive: true });
 
   runGit(["init", "-q"], repoRoot);
+
+  writeBase(repoRoot);
 
   writeSkill(
     repoRoot,
@@ -154,6 +169,67 @@ test("install is idempotent", (t) => {
   const installed = path.join(projectRoot, ".agents", "skills", "automation", "cypress");
   assert.ok(fs.existsSync(installed));
   assert.equal(fs.readdirSync(installed).length, 1);
+});
+
+test("install imports agents and instructions by default", (t) => {
+  const { repoUrl } = makeSkillRepo(t);
+  const projectRoot = makeConsumerProject(t);
+
+  const { stdout } = runCli(["install", "cypress", "--repo", repoUrl], projectRoot);
+
+  assert.match(stdout, /Installed: agents\//);
+  assert.match(stdout, /Installed: instructions\//);
+
+  assert.ok(
+    fs.existsSync(path.join(projectRoot, ".agents", "agents", "qa-engineer", "AGENT.md"))
+  );
+  assert.match(
+    fs.readFileSync(path.join(projectRoot, ".agents", "instructions", "general.md"), "utf8"),
+    /Regla base/
+  );
+});
+
+test("install with --no-base skips agents and instructions", (t) => {
+  const { repoUrl } = makeSkillRepo(t);
+  const projectRoot = makeConsumerProject(t);
+
+  const { stdout } = runCli(
+    ["install", "cypress", "--no-base", "--repo", repoUrl],
+    projectRoot
+  );
+
+  assert.doesNotMatch(stdout, /Installed: agents\//);
+  assert.ok(
+    !fs.existsSync(path.join(projectRoot, ".agents", "agents")),
+    "agents should not be installed with --no-base"
+  );
+  assert.ok(
+    !fs.existsSync(path.join(projectRoot, ".agents", "instructions")),
+    "instructions should not be installed with --no-base"
+  );
+  assert.ok(
+    fs.existsSync(path.join(projectRoot, ".agents", "skills", "automation", "cypress", "SKILL.md"))
+  );
+});
+
+test("update refreshes base folders", (t) => {
+  const { repoRoot, repoUrl } = makeSkillRepo(t);
+  const projectRoot = makeConsumerProject(t);
+
+  runCli(["install", "cypress", "--repo", repoUrl], projectRoot);
+
+  fs.writeFileSync(
+    path.join(repoRoot, ".agents", "instructions", "general.md"),
+    "# General\n\n- Nueva regla base."
+  );
+  commitAll(repoRoot, "update base");
+
+  runCli(["update", "--repo", repoUrl], projectRoot);
+
+  assert.match(
+    fs.readFileSync(path.join(projectRoot, ".agents", "instructions", "general.md"), "utf8"),
+    /Nueva regla base/
+  );
 });
 
 test("update refreshes installed skills but does not install new ones", (t) => {

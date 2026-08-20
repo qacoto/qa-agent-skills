@@ -34,6 +34,31 @@ function repoFromArgs(args) {
   return index >= 0 && args[index + 1] ? args[index + 1] : DEFAULT_REPO;
 }
 
+function positionalArgs(args) {
+  const result = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    if (arg === "--repo") {
+      i++;
+      continue;
+    }
+
+    if (arg.startsWith("--")) {
+      continue;
+    }
+
+    result.push(arg);
+  }
+
+  return result;
+}
+
+function hasFlag(args, flag) {
+  return args.includes(flag);
+}
+
 function cloneRepository(repo) {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "qa-agent-skills-"));
   try {
@@ -104,6 +129,21 @@ function installSkill(repoRoot, skill, projectRoot) {
   copySkill(source, destination);
 }
 
+const BASE_DIRS = ["agents", "instructions"];
+
+function installBase(repoRoot, projectRoot) {
+  for (const dir of BASE_DIRS) {
+    const source = path.join(repoRoot, ".agents", dir);
+    const destination = path.join(projectRoot, ".agents", dir);
+
+    if (!fs.existsSync(source)) continue;
+
+    fs.mkdirSync(destination, { recursive: true });
+    fs.cpSync(source, destination, { recursive: true });
+    console.log(`Installed: ${dir}/`);
+  }
+}
+
 function list(args) {
   const repo = repoFromArgs(args);
   const repoRoot = cloneRepository(repo);
@@ -132,7 +172,7 @@ function list(args) {
 
 function install(args) {
   const repo = repoFromArgs(args);
-  const skillNames = args.filter((arg) => !arg.startsWith("--"));
+  const skillNames = positionalArgs(args);
 
   if (!skillNames.length) {
     fail("Usage: qa-skills install <skill> [skill...]");
@@ -143,6 +183,10 @@ function install(args) {
 
   try {
     const available = getSkills(repoRoot);
+
+    if (!hasFlag(args, "--no-base")) {
+      installBase(repoRoot, projectRoot);
+    }
 
     for (const name of skillNames) {
       const skill = available.find((item) => item.id === name);
@@ -177,6 +221,10 @@ function update(args) {
     const availableByPath = new Map(
       available.map((skill) => [skill.relativePath, skill])
     );
+
+    if (!hasFlag(args, "--no-base")) {
+      installBase(repoRoot, projectRoot);
+    }
 
     const installed = [];
 
@@ -239,10 +287,13 @@ Commands:
       List available skills.
 
   qa-skills install <skill> [skill...]
-      Install one or more skills.
+      Install one or more skills. The base folders (.agents/agents and
+      .agents/instructions) are copied automatically by default. Use
+      --no-base to skip them.
 
   qa-skills update
-      Update only the skills already installed in .agents/skills.
+      Update only the skills already installed in .agents/skills, and the
+      base folders. Use --no-base to skip the base folders.
 
   qa-skills --version
       Print the CLI version.
