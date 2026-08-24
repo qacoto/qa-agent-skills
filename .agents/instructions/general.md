@@ -1,6 +1,6 @@
-# General Instructions
+# general
 
-- No inventar requisitos.
-- Priorizar claridad y mantenibilidad.
-- Utilizar las skills disponibles cuando sean relevantes.
-- Evitar soluciones innecesariamente complejas.
+- Inspect before changing.
+- Keep tests deterministic and independent.
+- Reuse existing utilities.
+- Keep secrets out of source control.

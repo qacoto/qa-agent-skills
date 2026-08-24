@@ -1,347 +1,60 @@
 #!/usr/bin/env node
-
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-const { execFileSync } = require("child_process");
-
-const DEFAULT_REPO =
-  process.env.QA_SKILLS_REPO_URL ||
-  "https://github.com/qacoto/qa-agent-skills.git";
-
-const VERSION = require("../package.json").version;
-
-function fail(message) {
-  console.error(`\nError: ${message}\n`);
-  process.exit(1);
-}
-
-function git(args, cwd = process.cwd()) {
-  try {
-    return execFileSync("git", args, {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"]
-    }).trim();
-  } catch (error) {
-    const stderr = error.stderr ? String(error.stderr).trim() : "";
-    fail(stderr || `Git command failed: git ${args.join(" ")}`);
-  }
-}
-
-function repoFromArgs(args) {
-  const index = args.indexOf("--repo");
-  return index >= 0 && args[index + 1] ? args[index + 1] : DEFAULT_REPO;
-}
-
-function positionalArgs(args) {
-  const result = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === "--repo") {
-      i++;
-      continue;
-    }
-
-    if (arg.startsWith("--")) {
-      continue;
-    }
-
-    result.push(arg);
-  }
-
-  return result;
-}
-
-function hasFlag(args, flag) {
-  return args.includes(flag);
-}
-
-function cloneRepository(repo) {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "qa-agent-skills-"));
-  try {
-    git(["clone", "--depth", "1", repo, temp]);
-    return temp;
-  } catch (error) {
-    fs.rmSync(temp, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-function getSkills(repoRoot) {
-  const skillsRoot = path.join(repoRoot, ".agents", "skills");
-
-  if (!fs.existsSync(skillsRoot)) {
-    fail("The repository does not contain .agents/skills.");
-  }
-
-  const skills = [];
-
-  for (const category of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
-    if (!category.isDirectory()) continue;
-
-    const categoryPath = path.join(skillsRoot, category.name);
-
-    for (const skill of fs.readdirSync(categoryPath, { withFileTypes: true })) {
-      if (!skill.isDirectory()) continue;
-
-      const skillPath = path.join(categoryPath, skill.name);
-      const skillFile = path.join(skillPath, "SKILL.md");
-
-      if (fs.existsSync(skillFile)) {
-        skills.push({
-          id: skill.name,
-          category: category.name,
-          relativePath: path.join(category.name, skill.name)
-        });
-      }
-    }
-  }
-
-  return skills.sort((a, b) =>
-    `${a.category}/${a.id}`.localeCompare(`${b.category}/${b.id}`)
-  );
-}
-
-function copySkill(source, destination) {
-  fs.rmSync(destination, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.cpSync(source, destination, { recursive: true });
-}
-
-function installSkill(repoRoot, skill, projectRoot) {
-  const source = path.join(
-    repoRoot,
-    ".agents",
-    "skills",
-    skill.relativePath
-  );
-
-  const destination = path.join(
-    projectRoot,
-    ".agents",
-    "skills",
-    skill.relativePath
-  );
-
-  copySkill(source, destination);
-}
-
-const BASE_DIRS = ["agents", "instructions"];
-
-function installBase(repoRoot, projectRoot) {
-  for (const dir of BASE_DIRS) {
-    const source = path.join(repoRoot, ".agents", dir);
-    const destination = path.join(projectRoot, ".agents", dir);
-
-    if (!fs.existsSync(source)) continue;
-
-    fs.mkdirSync(destination, { recursive: true });
-    fs.cpSync(source, destination, { recursive: true });
-    console.log(`Installed: ${dir}/`);
-  }
-}
-
-function list(args) {
-  const repo = repoFromArgs(args);
-  const repoRoot = cloneRepository(repo);
-
-  try {
-    const skills = getSkills(repoRoot);
-
-    console.log("\nAvailable skills:\n");
-
-    let category = null;
-
-    for (const skill of skills) {
-      if (skill.category !== category) {
-        category = skill.category;
-        console.log(`\n${category}`);
-      }
-
-      console.log(`  ${skill.id}`);
-    }
-
-    console.log("");
-  } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
-  }
-}
-
-function install(args) {
-  const repo = repoFromArgs(args);
-  const skillNames = positionalArgs(args);
-
-  if (!skillNames.length) {
-    fail("Usage: qa-skills install <skill> [skill...]");
-  }
-
-  const projectRoot = process.cwd();
-  const repoRoot = cloneRepository(repo);
-
-  try {
-    const available = getSkills(repoRoot);
-
-    if (!hasFlag(args, "--no-base")) {
-      installBase(repoRoot, projectRoot);
-    }
-
-    for (const name of skillNames) {
-      const skill = available.find((item) => item.id === name);
-
-      if (!skill) {
-        console.error(`Skill not found: ${name}`);
-        continue;
-      }
-
-      installSkill(repoRoot, skill, projectRoot);
-      console.log(`Installed: ${skill.category}/${skill.id}`);
-    }
-  } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
-  }
-}
-
-function update(args) {
-  const repo = repoFromArgs(args);
-  const projectRoot = process.cwd();
-  const installedRoot = path.join(projectRoot, ".agents", "skills");
-
-  if (!fs.existsSync(installedRoot)) {
-    console.log("No skills installed.");
-    return;
-  }
-
-  const repoRoot = cloneRepository(repo);
-
-  try {
-    const available = getSkills(repoRoot);
-    const availableByPath = new Map(
-      available.map((skill) => [skill.relativePath, skill])
-    );
-
-    if (!hasFlag(args, "--no-base")) {
-      installBase(repoRoot, projectRoot);
-    }
-
-    const installed = [];
-
-    for (const category of fs.readdirSync(installedRoot, {
-      withFileTypes: true
-    })) {
-      if (!category.isDirectory()) continue;
-
-      const categoryPath = path.join(installedRoot, category.name);
-
-      for (const skill of fs.readdirSync(categoryPath, {
-        withFileTypes: true
-      })) {
-        if (!skill.isDirectory()) continue;
-
-        const relativePath = path.join(category.name, skill.name);
-
-        installed.push({
-          id: skill.name,
-          category: category.name,
-          relativePath
-        });
-      }
-    }
-
-    if (!installed.length) {
-      console.log("No skills installed.");
-      return;
-    }
-
-    for (const skill of installed) {
-      const sourceSkill = availableByPath.get(skill.relativePath);
-
-      if (!sourceSkill) {
-        console.warn(
-          `Skipped: ${skill.category}/${skill.id} (not found in repository)`
-        );
-        continue;
-      }
-
-      installSkill(repoRoot, sourceSkill, projectRoot);
-      console.log(`Updated: ${skill.category}/${skill.id}`);
-    }
-  } finally {
-    fs.rmSync(repoRoot, { recursive: true, force: true });
-  }
-}
-
-function version() {
-  console.log(VERSION);
-}
-
-function help() {
-  console.log(`
-QA Agent Skills CLI
-
-Commands:
-
-  qa-skills list
-      List available skills.
-
-  qa-skills install <skill> [skill...]
-      Install one or more skills. The base folders (.agents/agents and
-      .agents/instructions) are copied automatically by default. Use
-      --no-base to skip them.
-
-  qa-skills update
-      Update only the skills already installed in .agents/skills, and the
-      base folders. Use --no-base to skip the base folders.
-
-  qa-skills --version
-      Print the CLI version.
-
-Examples:
-
-  qa-skills list
-
-  qa-skills install cypress
-
-  qa-skills install cypress frontend gitflow
-
-  qa-skills update
-
-For local testing:
-
-  qa-skills list --repo file:///absolute/path/to/qa-agent-skills
-`);
-}
-
-const [command, ...args] = process.argv.slice(2);
-
-switch (command) {
-  case "list":
-    list(args);
-    break;
-
-  case "install":
-    install(args);
-    break;
-
-  case "update":
-    update(args);
-    break;
-
-  case "help":
-  case "--help":
-  case "-h":
-  case undefined:
-    help();
-    break;
-
-  case "version":
-  case "--version":
-  case "-v":
-    version();
-    break;
-
-  default:
-    fail(`Unknown command: ${command}`);
-}
+const fs=require("fs"), os=require("os"), path=require("path");
+const {execFileSync}=require("child_process");
+const ROOT=process.cwd();
+const DEFAULT_REPO=process.env.QA_SKILLS_REPO_URL||"https://github.com/YOUR-ORG/qa-agent-skills.git";
+const META=path.join(ROOT,".agents",".qa-project.json");
+
+function fail(m){console.error(`\nError: ${m}\n`);process.exit(1)}
+function git(args){try{return execFileSync("git",args,{cwd:ROOT,encoding:"utf8",stdio:["ignore","pipe","pipe"]}).trim()}catch(e){fail(String(e.stderr||e.message).trim())}}
+function repoArg(a){let i=a.indexOf("--repo");return i>=0&&a[i+1]?a[i+1]:DEFAULT_REPO}
+function clone(repo){let t=fs.mkdtempSync(path.join(os.tmpdir(),"qa-skills-"));git(["clone","--depth","1",repo,t]);return t}
+function yaml(f){let r={},cur=null;for(const raw of fs.readFileSync(f,"utf8").split(/\r?\n/)){let l=raw.trimEnd();if(!l.trim()||l.trim().startsWith("#"))continue;let s=l.match(/^([A-Za-z0-9_-]+):\s*(.*)$/),x=l.match(/^\s{2}-\s+(.+)$/);if(s){r[s[1]]=s[2]?s[2].replace(/^['"]|['"]$/g,""):[];cur=s[2]?null:s[1]}else if(x&&cur)r[cur].push(x[1].replace(/^['"]|['"]$/g,""))}return r}
+function profiles(repo){let d=path.join(repo,"projects");return fs.existsSync(d)?fs.readdirSync(d,{withFileTypes:true}).filter(x=>x.isDirectory()).map(x=>{let f=path.join(d,x.name,"project.yml");return fs.existsSync(f)?{id:x.name,config:yaml(f)}:null}).filter(Boolean):[]}
+function skills(repo){let d=path.join(repo,".agents","skills"),out=[];if(!fs.existsSync(d))fail("Repository has no .agents/skills");for(const c of fs.readdirSync(d,{withFileTypes:true}).filter(x=>x.isDirectory()))for(const s of fs.readdirSync(path.join(d,c.name),{withFileTypes:true}).filter(x=>x.isDirectory()))if(fs.existsSync(path.join(d,c.name,s.name,"SKILL.md")))out.push({id:s.name,category:c.name,rel:path.join("skills",c.name,s.name)});return out.sort((a,b)=>(a.category+"/"+a.id).localeCompare(b.category+"/"+b.id))}
+function copy(repo,rel){let src=path.join(repo,".agents",rel),dst=path.join(ROOT,".agents",rel);if(!fs.existsSync(src))fail(`Component not found: .agents/${rel}`);fs.rmSync(dst,{recursive:true,force:true});fs.mkdirSync(path.dirname(dst),{recursive:true});fs.cpSync(src,dst,{recursive:true})}
+function list(a){let r=clone(repoArg(a));try{console.log("\nAvailable project types:\n");profiles(r).forEach(x=>console.log("  "+x.id));console.log("\nAvailable skills:");let c;for(const s of skills(r)){if(s.category!==c){c=s.category;console.log("\n"+c.toUpperCase())}console.log("  "+s.id)}console.log()}finally{fs.rmSync(r,{recursive:true,force:true})}}
+function install(a){let id=a.find(x=>!x.startsWith("--"));if(!id)fail("Usage: qa-skills install <project-type>");let r=clone(repoArg(a));try{let p=profiles(r).find(x=>x.id===id);if(!p)fail(`Project type not found: ${id}`);for(const x of p.config.agent||[])copy(r,path.join("agents",x));for(const x of p.config.skills||[])copy(r,path.join("skills",x));for(const x of p.config.instructions||[])copy(r,path.join("instructions",x));fs.mkdirSync(path.dirname(META),{recursive:true});fs.writeFileSync(META,JSON.stringify({projectType:id,agent:p.config.agent||[],skills:p.config.skills||[],instructions:p.config.instructions||[]},null,2)+"\n");console.log(`Installed project type: ${id}`)}finally{fs.rmSync(r,{recursive:true,force:true})}}
+function update(a){if(!fs.existsSync(META))fail("No installation found. Run qa-skills install <project-type> first.");let m=JSON.parse(fs.readFileSync(META)),r=clone(repoArg(a));try{for(const x of [...(m.agent||[]),...(m.skills||[]),...(m.instructions||[])]){let top=x.includes("/")?x.split("/")[0]:"agents";copy(r,path.join(top,x));}console.log(`Updated: ${m.projectType}`)}finally{fs.rmSync(r,{recursive:true,force:true})}}
+function detect(){let p=fs.existsSync("package.json")?JSON.parse(fs.readFileSync("package.json")):{};let d={...(p.dependencies||{}),...(p.devDependencies||{})};let c=!!d.cypress||fs.existsSync("cypress.config.js")||fs.existsSync("cypress.config.ts"),g=!!d["@badeball/cypress-cucumber-preprocessor"]||!!d["cypress-cucumber-preprocessor"],m=fs.existsSync("pom.xml");if(m)return"mobile-appium-java";if(c&&g)return"cypress-web-cucumber";if(c)return"cypress-web";return"unknown"}
+function init(a){let r=clone(repoArg(a));try{let type=fs.existsSync(META)?JSON.parse(fs.readFileSync(META)).projectType:detect(),p=profiles(r).find(x=>x.id===type),tree=fs.readdirSync(ROOT).filter(x=>![".git","node_modules"].includes(x)).sort().map(x=>"- "+x).join("\n");let md=`# AGENTS.md
+
+> Generated by \`qa-skills init\`. Project-specific context belongs here.
+
+## Project Context
+- Project type: ${type}
+- Framework: ${type.startsWith("cypress")?"Cypress":type==="mobile-appium-java"?"Appium + Java + Maven + Cucumber":"Unknown"}
+
+## Installed Agents
+${(p?.config.agent||[]).map(x=>"- "+x).join("\n")||"- None"}
+
+## Installed Skills
+${(p?.config.skills||[]).map(x=>"- "+x).join("\n")||"- None"}
+
+## Project Structure
+\`\`\`text
+${tree}
+\`\`\`
+
+## Architecture
+- Execution Layer: test/scenario execution and assertions.
+- Logic Layer: reusable business actions and technical abstractions.
+- Data Layer: fixtures, builders, factories and test data.
+
+## Project-Specific Context
+
+<!-- LLM_CONTEXT_START
+Add project-specific facts here: domain, environments, commands, auth strategy,
+conventions, dependencies, CI/CD, constraints and documented exceptions.
+LLM_CONTEXT_END -->
+
+## Working Rules
+1. Follow installed skills for framework-specific implementation.
+2. Follow this file for project-specific conventions.
+3. Preserve Execution / Logic / Data separation.
+4. Inspect existing code before adding abstractions.
+5. Do not invent undocumented project behavior.
+`;
+fs.writeFileSync("AGENTS.md",md);console.log("Generated: AGENTS.md")}finally{fs.rmSync(r,{recursive:true,force:true})}}
+function help(){console.log(`QA Agent Skills CLI\n\nqa-skills list\nqa-skills install <project-type>\nqa-skills update\nqa-skills init\n\nOptional: --repo <git-url>`)}
+let [cmd,...args]=process.argv.slice(2);switch(cmd){case"list":list(args);break;case"install":install(args);break;case"update":update(args);break;case"init":init(args);break;default:help()}

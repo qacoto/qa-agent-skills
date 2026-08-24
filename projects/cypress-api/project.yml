@@ -1,0 +1,14 @@
+name: cypress-api
+agent:
+  - cypress-api-agent
+skills:
+  - general/best-practices
+  - general/design-patterns
+  - general/test-design
+  - cypress/core
+  - cypress/api-js
+  - reporting/mochawesome
+instructions:
+  - general
+  - coding-standards
+  - testing-standards

@@ -1,0 +1,16 @@
+name: cypress-web-cucumber
+agent:
+  - cypress-cucumber-agent
+skills:
+  - general/best-practices
+  - general/design-patterns
+  - general/test-design
+  - general/bdd
+  - cypress/core
+  - cypress/web-js
+  - cypress/cucumber-js
+  - reporting/mochawesome
+instructions:
+  - general
+  - coding-standards
+  - testing-standards
