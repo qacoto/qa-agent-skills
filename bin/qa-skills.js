@@ -17,16 +17,256 @@ function list(a){let r=clone(repoArg(a));try{console.log("\nTipos de proyecto di
 function install(a){let id=a.find(x=>!x.startsWith("--"));if(!id)fail("Uso: qa-skills install <tipo-proyecto>");let r=clone(repoArg(a));try{let p=profiles(r).find(x=>x.id===id);if(!p)fail(`Tipo de proyecto no encontrado: ${id}`);for(const x of p.config.agent||[])copy(r,path.join("agents",x));for(const x of p.config.skills||[])copy(r,path.join("skills",x));for(const x of p.config.rules||[])copy(r,path.join("rules",x));fs.mkdirSync(path.dirname(META),{recursive:true});fs.writeFileSync(META,JSON.stringify({projectType:id,agent:p.config.agent||[],skills:p.config.skills||[],rules:p.config.rules||[]},null,2)+"\n");console.log(`Tipo de proyecto instalado: ${id}`)}finally{fs.rmSync(r,{recursive:true,force:true})}}
 function update(a){if(!fs.existsSync(META))fail("No hay instalación ejecuta qa-skills install <tipo-proyecto> primero.");let m=JSON.parse(fs.readFileSync(META)),r=clone(repoArg(a));try{for(const x of [...(m.agent||[]),...(m.skills||[]),...(m.rules||[])]){let top=x.includes("/")?x.split("/")[0]:"agents";copy(r,path.join(top,x));}console.log(`Actualizado: ${m.projectType}`)}finally{fs.rmSync(r,{recursive:true,force:true})}}
 function detect(){let p=fs.existsSync("package.json")?JSON.parse(fs.readFileSync("package.json")):{};let d={...(p.dependencies||{}),...(p.devDependencies||{})};let c=!!d.cypress||fs.existsSync("cypress.config.js")||fs.existsSync("cypress.config.ts"),g=!!d["@badeball/cypress-cucumber-preprocessor"]||!!d["cypress-cucumber-preprocessor"],m=fs.existsSync("pom.xml");if(m)return"mobile-appium-java";if(c&&g)return"cypress-web-cucumber";if(c)return"cypress-web";return"unknown"}
-function init(a){let r=clone(repoArg(a));try{let type=fs.existsSync(META)?JSON.parse(fs.readFileSync(META)).projectType:detect(),p=profiles(r).find(x=>x.id===type),tree=fs.readdirSync(ROOT).filter(x=>![".git","node_modules"].includes(x)).sort().map(x=>"  "+x).join("\n");let framework=type.startsWith("cypress")?"Cypress":type==="mobile-appium-java"?"Appium + Java + Maven + Cucumber":"Desconocido";let md=`# AGENTS.md
 
-> Generado automáticamente por \`qa-skills init\`. Actualiza este archivo con la información específica de tu proyecto.
+function scanPackageJson(){
+  let pkg={exists:false,name:"",description:"",scripts:{},dependencies:{},devDependencies:{}};
+  try{let raw=fs.readFileSync("package.json","utf8");pkg={...JSON.parse(raw),exists:true};}catch(e){}
+  return pkg;
+}
+
+function scanPomXml(){
+  let pom={exists:false,groupId:"",artifactId:"",dependencies:[]};
+  try{
+    let raw=fs.readFileSync("pom.xml","utf8");
+    let gid=raw.match(/<groupId>([^<]+)<\/groupId>/);
+    let aid=raw.match(/<artifactId>([^<]+)<\/artifactId>/);
+    let deps=raw.match(/<dependency>[\s\S]*?<\/dependency>/g)||[];
+    pom={exists:true,groupId:gid?gid[1]:"",artifactId:aid?aid[1]:"",dependencies:deps.map(d=>{
+      let g=d.match(/<groupId>([^<]+)<\/groupId>/);
+      let a=d.match(/<artifactId>([^<]+)<\/artifactId>/);
+      return g&&a?{groupId:g[1],artifactId:a[1]}:null;
+    }).filter(Boolean)};
+  }catch(e){}
+  return pom;
+}
+
+function scanStructure(dir,depth=0,maxDepth=2){
+  let result="";
+  try{
+    let items=fs.readdirSync(dir,{withFileTypes:true});
+    items=items.filter(i=>![".git","node_modules",".DS_Store","dist","build","target",".next",".nuxt"].includes(i.name));
+    items.sort((a,b)=>{
+      if(a.isDirectory()&&!b.isDirectory())return -1;
+      if(!a.isDirectory()&&b.isDirectory())return 1;
+      return a.name.localeCompare(b.name);
+    });
+    for(let i of items){
+      if(depth>=maxDepth)break;
+      let prefix="  ".repeat(depth);
+      if(i.isDirectory()){
+        result+=prefix+i.name+"/\n";
+        let sub=scanStructure(path.join(dir,i.name),depth+1,maxDepth);
+        if(sub)result+=sub;
+      }else{
+        result+=prefix+i.name+"\n";
+      }
+    }
+  }catch(e){}
+  return result;
+}
+
+function detectConventions(){
+  let conv={testPattern:"",pageObjectPattern:"",fixturePattern:"",hasCustomCommands:false,hasStepDefs:false};
+  try{
+    let cypressDir=fs.existsSync("cypress");
+    if(cypressDir){
+      let e2eDir=fs.existsSync("cypress/e2e")||fs.existsSync("cypress/integration");
+      conv.testPattern=e2eDir?"*.cy.js / *.feature":"*.spec.js";
+      conv.fixturePattern=fs.existsSync("cypress/fixtures")?"cypress/fixtures/*.json":"No encontrado";
+      conv.hasCustomCommands=fs.existsSync("cypress/support/commands.js")||fs.existsSync("cypress/support/commands.ts");
+      conv.hasStepDefs=fs.existsSync("cypress/support/step_definitions")||fs.existsSync("cypress/support/steps");
+    }
+    let srcDir=fs.existsSync("src");
+    if(srcDir){
+      let pageObjects=fs.readdirSync("src",{recursive:true}).filter(f=>f.toString().includes("Page"));
+      conv.pageObjectPattern=pageObjects.length>0?"src/**/[Nombre]Page.js":"No encontrado";
+    }
+  }catch(e){}
+  return conv;
+}
+
+function scanEnvFiles(){
+  let env={hasEnv:false,hasEnvExample:false,hasGitignoreEnv:false,variables:[]};
+  try{
+    env.hasEnv=fs.existsSync(".env");
+    env.hasEnvExample=fs.existsSync(".env.example")||fs.existsSync(".env.template");
+    if(fs.existsSync(".gitignore")){
+      let gitignore=fs.readFileSync(".gitignore","utf8");
+      env.hasGitignoreEnv=gitignore.includes(".env");
+    }
+    if(env.hasEnv){
+      let content=fs.readFileSync(".env","utf8");
+      env.variables=content.split("\n").filter(l=>l&&!l.startsWith("#")).map(l=>l.split("=")[0].trim());
+    }
+    if(env.hasEnvExample){
+      let content=fs.readFileSync(".env.example","utf8")||fs.readFileSync(".env.template","utf8");
+      env.variables=content.split("\n").filter(l=>l&&!l.startsWith("#")).map(l=>l.split("=")[0].trim());
+    }
+  }catch(e){}
+  return env;
+}
+
+function scanCiCd(){
+  let ci={hasGithub:false,hasGitlab:false,hasJenkins:false,hasCirlce:false,workflows:[]};
+  try{
+    ci.hasGithub=fs.existsSync(".github/workflows");
+    ci.hasGitlab=fs.existsSync(".gitlab-ci.yml");
+    ci.hasJenkins=fs.existsSync("Jenkinsfile");
+    ci.hasCirlce=fs.existsSync(".circleci/config.yml");
+    if(ci.hasGithub){
+      let workflows=fs.readdirSync(".github/workflows").filter(f=>f.endsWith(".yml")||f.endsWith(".yaml"));
+      ci.workflows=workflows.map(w=>w.replace(/\.(yml|yaml)$/,""));
+    }
+  }catch(e){}
+  return ci;
+}
+
+function scanFixtures(){
+  let fixtures={locations:[],hasBuilders:false,hasFactories:false,dataFiles:[]};
+  try{
+    let fixtureDirs=["cypress/fixtures","src/fixtures","fixtures","test/fixtures","__fixtures__","test-data"];
+    fixtureDirs.forEach(d=>{
+      if(fs.existsSync(d)){
+        fixtures.locations.push(d);
+        let files=fs.readdirSync(d).filter(f=>f.endsWith(".json")||f.endsWith(".js")||f.endsWith(".ts"));
+        fixtures.dataFiles.push(...files.map(f=>d+"/"+f));
+      }
+    });
+    fixtures.hasBuilders=fs.existsSync("builders")||fs.existsSync("src/builders");
+    fixtures.hasFactories=fs.existsSync("factories")||fs.existsSync("src/factories");
+  }catch(e){}
+  return fixtures;
+}
+
+function detectExternalDeps(){
+  let deps={apis:[],databases:[],services:[]};
+  try{
+    let env=scanEnvFiles();
+    env.variables.forEach(v=>{
+      if(v.toUpperCase().includes("API")||v.toUpperCase().includes("URL"))deps.apis.push(v);
+      if(v.toUpperCase().includes("DB")||v.toUpperCase().includes("DATABASE")||v.toUpperCase().includes("MONGO"))deps.databases.push(v);
+    });
+  }catch(e){}
+  return deps;
+}
+
+function init(a){
+  let r=clone(repoArg(a));
+  try{
+    let type=fs.existsSync(META)?JSON.parse(fs.readFileSync(META)).projectType:detect();
+    let p=profiles(r).find(x=>x.id===type);
+    
+    let pkg=scanPackageJson();
+    let pom=scanPomXml();
+    let env=scanEnvFiles();
+    let ci=scanCiCd();
+    let fixtures=scanFixtures();
+    let conv=detectConventions();
+    let deps=detectExternalDeps();
+    
+    let projectName=pkg.exists?(pkg.name||path.basename(ROOT)):pom.exists?pom.artifactId:path.basename(ROOT);
+    let description=pkg.exists?(pkg.description||""):pom.exists?"Proyecto Java/Maven":"";
+    let framework=type.startsWith("cypress")?"Cypress":type==="mobile-appium-java"?"Appium + Java + Maven + Cucumber":"Desconocido";
+    let language=type==="mobile-appium-java"?"Java":"JavaScript/TypeScript";
+    let pkgManager=type==="mobile-appium-java"?"Maven":"npm";
+    
+    let tree=scanStructure(ROOT,0,2);
+    
+    let testScripts=[];
+    if(pkg.exists&&pkg.scripts){
+      Object.entries(pkg.scripts).forEach(([k,v])=>{
+        if(k.includes("test")||k.includes("cypress")||k.includes("e2e")){
+          testScripts.push({name:k,command:v});
+        }
+      });
+    }
+    
+    let allDeps=pkg.exists?{...(pkg.dependencies||{}),...(pkg.devDependencies||{})}:{};
+    let hasCypress=!!allDeps.cypress||fs.existsSync("cypress.config.js")||fs.existsSync("cypress.config.ts");
+    let hasCucumber=!!allDeps["@badeball/cypress-cucumber-preprocessor"];
+    let hasMocha=!!allDeps.mocha||!!allDeps["@types/mocha"];
+    let hasJest=!!allDeps.jest;
+    let hasPlaywright=!!allDeps["@playwright/test"];
+    let hasAllure=!!allDeps["allure-commandline"]||!!allDeps["allure-js-commons"];
+    let hasMochawesome=!!allDeps.mochawesome;
+    let hasPrettier=!!allDeps.prettier;
+    let hasEslint=!!allDeps.eslint;
+    let hasTypescript=!!allDeps.typescript||!!allDeps["ts-node"];
+    
+    let envTable="";
+    if(env.variables.length>0){
+      env.variables.forEach(v=>{envTable+=`| \`${v}\` | Configurado en .env | Ver .env.example |\n`;});
+    }else{
+      envTable=`| \`API_URL\` | URL base de la API | \`http://localhost:3000\` |\n| \`TEST_USER\` | Usuario de prueba | \`test@example.com\` |`;
+    }
+    
+    let scriptsTable="";
+    if(testScripts.length>0){
+      testScripts.forEach(s=>{scriptsTable+=`| \`${s.name}\` | \`${s.command}\` |\n`;});
+    }else if(type==="mobile-appium-java"){
+      scriptsTable=`| \`test\` | \`mvn test\` |\n| \`test:headed\` | \`mvn test -Dheaded=true\` |`;
+    }else{
+      scriptsTable=`| \`test\` | \`npx cypress run\` |\n| \`test:headed\` | \`npx cypress open\` |`;
+    }
+    
+    let frameworksList=[];
+    if(hasCypress)frameworksList.push("- **Cypress**: framework de testing E2E");
+    if(hasCucumber)frameworksList.push("- **Cucumber**: BDD con Gherkin");
+    if(hasMocha)frameworksList.push("- **Mocha**: runner de tests");
+    if(hasJest)frameworksList.push("- **Jest**: framework de testing");
+    if(hasPlaywright)frameworksList.push("- **Playwright**: testing multi-navegador");
+    if(hasMochawesome)frameworksList.push("- **Mochawesome**: reportes HTML");
+    if(hasAllure)frameworksList.push("- **Allure Report**: reportes con evidencias");
+    if(hasPrettier)frameworksList.push("- **Prettier**: formateo de código");
+    if(hasEslint)frameworksList.push("- **ESLint**: análisis estático");
+    if(hasTypescript)frameworksList.push("- **TypeScript**: tipado estático");
+    if(type==="mobile-appium-java")frameworksList=["- **Appium**: automatización mobile","- **Maven**: gestión de dependencias","- **TestNG/JUnit**: framework de testing Java","- **Allure Report**: reportes con evidencias"];
+    if(frameworksList.length===0)frameworksList=["- [Configurar frameworks]"];
+    
+    let ciSection="";
+    if(ci.hasGithub){
+      ciSection="### GitHub Actions\n\n";
+      if(ci.workflows.length>0){
+        ci.workflows.forEach(w=>{ciSection+=`- \`.github/workflows/${w}.yml\`\n`;});
+      }else{
+        ciSection+="- workflows detectados en `.github/workflows/`\n";
+      }
+    }
+    if(ci.hasGitlab)ciSection+="### GitLab CI\n\n- `.gitlab-ci.yml`\n";
+    if(ci.hasJenkins)ciSection+="### Jenkins\n\n- `Jenkinsfile`\n";
+    if(!ciSection)ciSection="**No se detectó configuración de CI/CD**\n\n> Agrega la documentación de tu pipeline aquí.";
+    
+    let fixtureSection="";
+    if(fixtures.locations.length>0){
+      fixtureSection="### Ubicaciones Detectadas\n\n";
+      fixtures.locations.forEach(l=>{fixtureSection+=`- \`${l}/\`\n`;});
+      if(fixtures.dataFiles.length>0){
+        fixtureSection+="\n### Archivos de Datos\n\n";
+        fixtures.dataFiles.slice(0,10).forEach(f=>{fixtureSection+=`- \`${f}\`\n`;});
+        if(fixtures.dataFiles.length>10)fixtureSection+=`- ... y ${fixtures.dataFiles.length-10} más\n`;
+      }
+    }else{
+      fixtureSection="**No se detectaron fixtures**\n\n> Crea la carpeta \`fixtures/\` o \`cypress/fixtures/\` para datos de prueba.";
+    }
+    
+    let convSection="";
+    if(conv.testPattern)convSection+=`- **Patrón de tests**: \`${conv.testPattern}\`\n`;
+    if(conv.pageObjectPattern)convSection+=`- **Page Objects**: \`${conv.pageObjectPattern}\`\n`;
+    if(conv.fixturePattern)convSection+=`- **Fixtures**: \`${conv.fixturePattern}\`\n`;
+    if(conv.hasCustomCommands)convSection+="- **Custom Commands**: detectados en \`cypress/support/commands.js\`\n";
+    if(conv.hasStepDefs)convSection+="- **Step Definitions**: detectados en \`cypress/support/step_definitions/\`\n";
+    if(!convSection)convSection="- [Documentar convenciones del proyecto]";
+
+    let md=`# AGENTS.md
+
+> Generado automáticamente por \`qa-skills init\` el ${new Date().toISOString().split('T')[0]}. Este archivo se actualiza con datos reales del proyecto.
 
 ---
 
 ## Contexto del Proyecto
 
-- **Nombre**: [Nombre del proyecto]
-- **Descripción**: [Breve descripción del propósito del proyecto]
+- **Nombre**: ${projectName}
+- **Descripción**: ${description||"[Agregar descripción del proyecto]"}
 - **Tipo de proyecto**: ${type}
 - **Entorno**: [Producción / Staging / Desarrollo]
 
@@ -35,10 +275,9 @@ function init(a){let r=clone(repoArg(a));try{let type=fs.existsSync(META)?JSON.p
 ## Stack Tecnológico
 
 - **Framework principal**: ${framework}
-- **Lenguaje**: ${type==="mobile-appium-java"?"Java":"JavaScript"}
-- **Gestor de dependencias**: ${type==="mobile-appium-java"?"Maven":"npm"}
-- **Base de datos**: [PostgreSQL / MongoDB / MySQL / No aplica]
-- **Servicios externos**: [APIs, microservicios, etc.]
+- **Lenguaje**: ${language}
+- **Gestor de dependencias**: ${pkgManager}${hasTypescript?" + TypeScript":""}
+${deps.databases.length>0?"- **Base de datos**: "+deps.databases.join(", "):"- **Base de datos**: [No detectada]"}
 
 ---
 
@@ -62,8 +301,7 @@ ${tree}
 # Instalar dependencias
 ${type==="mobile-appium-java"?"mvn clean install":"npm install"}
 
-# Ejecutar la aplicación (si aplica)
-${type==="mobile-appium-java"?"mvn spring-boot:run":"npm run dev"}
+${pkg.scripts&&pkg.scripts.dev?"# Ejecutar la aplicación\nnpm run dev\n":pkg.scripts&&pkg.scripts.start?"# Ejecutar la aplicación\nnpm run start\n":"# Ejecutar la aplicación (configurar script en package.json)\n# npm run dev\n"}
 \`\`\`
 
 ---
@@ -71,31 +309,26 @@ ${type==="mobile-appium-java"?"mvn spring-boot:run":"npm run dev"}
 ## Cómo Ejecutar Tests
 
 \`\`\`bash
-# Ejecutar todos los tests
-${type==="mobile-appium-java"?"mvn test":type==="cypress-web-cucumber"?"npx cypress run":"npx cypress run"}
-
-# Ejecutar suite específica
-${type==="mobile-appium-java"?"mvn test -Dtest=NombreTest":type.startsWith("cypress")?"npx cypress run --spec cypress/e2e/ruta/archivo.cy.js":"npm test"}
-
-# Ejecutar en modo headed (visual)
-${type==="mobile-appium-java"?"mvn test -Dheaded=true":"npx cypress open"}
-
-# Ver reporte generado
-${type==="mobile-appium-java"?"allure serve target/allure-results":"npx mochawesome-report-cli cypress/reports/*.json"}
+${scriptsTable.split("\n").filter(s=>s.includes("|")).map(s=>{
+  let parts=s.split("|").filter(p=>p.trim());
+  if(parts.length>=3)return `# ${parts[1].trim().replace(/\\\`/g,"")}\n${parts[2].trim().replace(/\\\`/g,"")}`;
+  return"";
+}).filter(Boolean).join("\n\n")}
 \`\`\`
 
 ---
 
 ## Configuración de Ambientes
 
-| Variable | Descripción | Valor por defecto |
-|----------|-------------|-------------------|
-| \`API_URL\` | URL base de la API | \`http://localhost:3000\` |
-| \`DB_HOST\` | Host de base de datos | \`localhost\` |
-| \`TEST_USER\` | Usuario de prueba | \`test@example.com\` |
-| \`TEST_PASS\` | Contraseña de prueba | \`[CONFIGURAR]\` |
+${env.hasEnv||env.hasEnvExample?`${env.hasEnv?"**Archivo \`.env\` detectado**": "**Archivo \`.env.example\` detectado**"}
+${env.hasGitignoreEnv?"✅ `.env` está en `.gitignore`":"⚠️ **ADVERTENCIA**: `.env` NO está en `.gitignore` - agregalo por seguridad"}
 
-**Archivo de configuración**: \`.env\` (no commitear credenciales reales)
+### Variables Detectadas
+
+| Variable | Descripción | Ubicación |
+|----------|-------------|-----------|
+${envTable}
+`:"**No se detectó archivo \`.env\`**\n\n> Crea un archivo \`.env.example\` con las variables necesarias."}
 
 ---
 
@@ -105,45 +338,35 @@ ${type==="mobile-appium-java"?"allure serve target/allure-results":"npx mochawes
 
 | Tipo | Cobertura | Herramienta |
 |------|-----------|-------------|
-| Unitarias | Funciones aisladas | Jest / JUnit |
-| Integración | Flujos completos | Cypress / Appium |
-| E2E | Usuario final | Cypress / Appium |
-| API | Endpoints | cy.api() / RestAssured |
+| E2E | Flujos de usuario completos | ${hasCypress?"Cypress":hasPlaywright?"Playwright":"[Configurar]"} |
+| API | Endpoints REST | ${hasCypress?"cy.api() / cy.request()":"[Configurar]"} |
+| BDD | Criterios de aceptación | ${hasCucumber?"Cucumber + Gherkin":"[No configurado]"} |
+| Unitarias | Funciones aisladas | ${hasJest?"Jest":"[Configurar]"} |
 
 ### Criterios de Aceptación
 
-- [ ] Tests unitarios con cobertura mínima del 80%
-- [ ] Tests E2E para flujos críticos del negocio
-- [ ] Validación de inputs y casos negativos
-- [ ] Verificación de seguridad básica
+- [ ] Tests deterministas y repetibles
+- [ ] Sin \`sleep\` fijos: usar esperas explícitas
+- [ ] Datos de prueba en fixtures, sin hardcodear
+- [ ] Aserciones verifican resultados, no pasos intermedios
 
 ---
 
 ## Frameworks Utilizados
 
-${type.startsWith("cypress")?`- **Cypress**: framework de testing E2E para web
-- **Mochawesome**: generación de reportes HTML
-- **@badeball/cypress-cucumber-preprocessor**: integración Cucumber (si aplica)`:`- **Appium**: automatización mobile multiplataforma
-- **TestNG**: framework de testing Java
-- **Maven**: gestión de dependencias y build
-- **Allure Report**: generación de reportes con evidencias`}
+${frameworksList.join("\n")}
 
 ---
 
 ## Convenciones del Proyecto
 
-### Nomenclatura
+${convSection}
 
-- **Archivos de test**: \`[nombre].cy.js\` (Cypress) o \`[Nombre]Test.java\` (Java)
-- **Page Objects**: \`[Nombre]Page.js\` / \`[Nombre]Page.java\`
-- **Fixtures**: \`[nombre].json\` en carpeta \`fixtures/\`
-
-### Código
+### Arquitectura
 
 - Separación estricta ELD (Ejecución / Lógica / Datos)
 - POM (Page Object Model) obligatorio para UI
 - Aserciones sobre resultados, no sobre pasos intermedios
-- Sin \`sleep\` fijos: usar esperas explícitas
 
 ---
 
@@ -151,10 +374,9 @@ ${type.startsWith("cypress")?`- **Cypress**: framework de testing E2E para web
 
 <!-- Documenta los patrones de diseño ya implementados en tu proyecto -->
 
-- **Page Object Model**: [Descripción de cómo se aplica]
-- **Builder Pattern**: [Si se usa para construir datos de prueba]
+${conv.hasCustomCommands?"- **Custom Commands**: detectados en \`cypress/support/commands.js\`":"- **Page Object Model**: [Describir cómo se aplica]"}
+${conv.hasStepDefs?"- **Step Definitions**: detectados en \`cypress/support/step_definitions/\`":"- **Builder Pattern**: [Si se usa para datos de prueba]"}
 - **Factory Pattern**: [Si se usa para crear objetos de prueba]
-- **Custom Commands**: [Comandos personalizados en Cypress]
 
 ---
 
@@ -168,71 +390,42 @@ ${type.startsWith("cypress")?`- **Cypress**: framework de testing E2E para web
 
 ---
 
-## Datos dePrueba
+## Datos de Prueba
 
-### Tipos de Datos
+### Gestión de Datos Detectada
 
-| Tipo | Ubicación | Ejemplo |
-|------|-----------|---------|
-| Fixtures estáticos | \`cypress/fixtures/\` | \`users.json\`, \`products.json\` |
-| Generación dinámica | \`support/\` | \`generateUser()\`, \`createProduct()\` |
-| Builders | \`builders/\` | \`UserBuilder\`, \`ProductBuilder\` |
+${fixtureSection}
 
-### Gestión de Datos
+### Estrategia Recomendada
 
+- Fixtures versionados en control de versiones
+- Builders/Factories para generación dinámica
 - Datos negativos explícitos para validación de inputs
 - Datos boundary para límites
-- Datos de usuario por rol (admin, user, guest)
-- Versionado de fixtures en control de versiones
 
 ---
 
 ## Dependencias Externas
 
-### Servicios Dependientes
+${deps.apis.length>0?`### APIs Detectadas
 
-| Servicio | URL | Autenticación |
-|----------|-----|---------------|
-| API Principal | [URL] | Bearer Token |
-| Base de Datos | [HOST:PORT] | User/Pass |
-| Servicio de Mail | [URL] | API Key |
+| Variable | Ubicación |
+|----------|-----------|
+${deps.apis.map(d=>`| \`${d}\` | .env |`).join("\n")}
+`:"### APIs\n\n> Documenta las APIs externas que consume tu proyecto"}
 
-### APIs Mock
+${deps.databases.length>0?`### Base de Datos Detectada
 
-- [Documentar mocks configurados si aplica]
+| Variable | Ubicación |
+|----------|-----------|
+${deps.databases.map(d=>`| \`${d}\` | .env |`).join("\n")}
+`:"### Base de Datos\n\n> Documenta las bases de datos que utiliza tu proyecto"}
 
 ---
 
 ## CI/CD
 
-### Pipeline
-
-\`\`\`yaml
-# Ejemplo de pipeline
-stages:
-  - install
-  - lint
-  - test-unit
-  - test-integration
-  - test-e2e
-  - report
-\`\`\`
-
-### Comandos CI
-
-\`\`\`bash
-# Instalación
-npm ci
-
-# Lint
-npm run lint
-
-# Tests
-npm run test:ci
-
-# Reporte
-npm run report:merge
-\`\`\`
+${ciSection}
 
 ---
 
