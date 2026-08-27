@@ -17,6 +17,8 @@ Principios transversales que todo proyecto de automatización del equipo debe re
 
 ## Reglas
 
+- **Preguntar antes de desarrollar**: **OBLIGATORIO** preguntar y confirmar con el usuario antes de implementar cualquier cambio. No asumir comportamiento, no inventar funcionalidad no solicitada, no hardcodear valores sin confirmación.
+- **No inventar ni hardcodear**: si no existe documentación o instrucción explícita sobre cómo implementar algo, **PREGUNTAR** al usuario antes de proceder. No crear mocks, datos, endpoints o comportamiento no especificado.
 - **POM obligatorio** para toda prueba UI (Web y Mobile). Ver `general/design-patterns`.
 - **Reportería estándar obligatoria**:
   - Cypress (Web/API/BDD): **Mochawesome** → `reporting/mochawesome`.
@@ -30,12 +32,14 @@ Principios transversales que todo proyecto de automatización del equipo debe re
 
 ## Checklist antes de abrir PR
 
+- [ ] Se preguntó y confirmó el alcance con el usuario antes de implementar.
 - [ ] Tests deterministas y pasan repetidamente (mínimo 2 corridas locales).
 - [ ] Sin sleeps fijos ni timeouts inflados para "arreglar" flakiness.
 - [ ] Selectores/locators estables encapsulados en Page/Screen Objects.
 - [ ] Datos de prueba en fixtures/builders, sin credenciales hardcodeadas.
 - [ ] Aserciones verifican resultado esperado, incluidos casos negativos donde aplique.
 - [ ] Reporter configurado y adjuntando evidencias (screenshots/videos/attachments).
+- [ ] No se inventó ni hardcodeó nada no especificado por el usuario.
 
 ## Contexto Específico del Proyecto
 
