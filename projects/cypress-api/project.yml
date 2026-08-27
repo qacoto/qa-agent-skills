@@ -5,10 +5,12 @@ skills:
   - general/best-practices
   - general/design-patterns
   - general/test-design
+  - general/security-testing
+  - general/data-driven-testing
   - cypress/core
   - cypress/api-js
   - reporting/mochawesome
-instructions:
+rules:
   - general
   - coding-standards
   - testing-standards

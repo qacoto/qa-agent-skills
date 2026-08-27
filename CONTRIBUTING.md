@@ -8,8 +8,8 @@ Guía para el equipo que mantiene este repositorio. No es documentación públic
 | :--- | :--- |
 | `.agents/skills/<categoría>/<skill>/SKILL.md` | Conocimiento técnico reutilizable (Cypress, Mobile, Reporting, General...) |
 | `.agents/agents/<rol>/AGENT.md` | Roles especializados que guían al agente de IA |
-| `.agents/instructions/<norma>.md` | Reglas transversales aplicables a todos los proyectos |
-| `projects/<perfil>/project.yml` | Composición de agente + skills + instrucciones por tipo de proyecto |
+| `.agents/rules/<norma>.md` | Reglas transversales aplicables a todos los proyectos |
+| `projects/<perfil>/project.yml` | Composición de agente + skills + reglas por tipo de proyecto |
 | `bin/qa-skills.js` | CLI (`list`, `install`, `update`, `init`) |
 
 Agregar una categoría nueva (ej. `playwright/`, `restassured/`) no requiere cambios en la CLI: basta crear la carpeta dentro de `.agents/skills/`.
@@ -49,7 +49,7 @@ LLM_CONTEXT_END
 
 ---
 
-## Cómo agregar un agente o instrucción
+## Cómo agregar un agente o regla
 
 **Agente**: `.agents/agents/<rol>/AGENT.md` con formato mínimo:
 
@@ -66,7 +66,7 @@ Especialidad y responsabilidad en 1–2 líneas.
 - Do not invent undocumented behavior.
 ```
 
-**Instrucción**: `.agents/instructions/<norma>.md`, listas cortas de reglas transversales sin detalles de framework.
+**Regla**: `.agents/rules/<norma>.md`, listas cortas de reglas transversales sin detalles de framework.
 
 ---
 
@@ -87,7 +87,7 @@ instructions:
 
 Restricciones del parser:
 
-- Solo claves de primer nivel (`name`, `agent`, `skills`, `instructions`) y listas con dos espacios de sangría + `- item`.
+- Solo claves de primer nivel (`name`, `agent`, `skills`, `rules`) y listas con dos espacios de sangría + `- item`.
 - Sin claves anidadas, sin comentarios inline, sin tabs.
 - La composición es explícita: cada perfil lista todos sus componentes aunque se repitan entre perfiles. No inventar mecanismos tipo `extends`.
 - Todo componente referenciado debe existir en `.agents/`; una referencia rota falla recién en el proyecto consumidor.

@@ -6,11 +6,13 @@ skills:
   - general/design-patterns
   - general/test-design
   - general/bdd
+  - general/security-testing
+  - general/data-driven-testing
   - cypress/core
   - cypress/web-js
   - cypress/cucumber-js
   - reporting/mochawesome
-instructions:
+rules:
   - general
   - coding-standards
   - testing-standards
