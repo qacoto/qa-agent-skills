@@ -1,6 +1,6 @@
 ---
 name: best-practices
-description: Buenas prácticas generales de QA y automatización: arquitectura ELD, POM obligatorio en UI, determinismo, independencia, reportería estándar (Mochawesome/Allure) y aserciones de resultado.
+description: "Buenas prácticas generales de QA y automatización: arquitectura ELD, POM obligatorio en UI, determinismo, independencia, reportería estándar (Mochawesome/Allure) y aserciones de resultado."
 ---
 
 # Best Practices

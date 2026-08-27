@@ -1,6 +1,6 @@
 ---
 name: cucumber-java
-description: Cucumber JVM para mobile con Java: step definitions finos delegando a Screen Objects, inyección de dependencias con PicoContainer y hooks con evidencias hacia Allure.
+description: "Cucumber JVM para mobile con Java: step definitions finos delegando a Screen Objects, inyección de dependencias con PicoContainer y hooks con evidencias hacia Allure."
 ---
 
 # Cucumber Java (Mobile)

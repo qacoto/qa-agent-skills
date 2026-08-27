@@ -1,6 +1,6 @@
 ---
 name: data-driven-testing
-description: Pruebas basadas en datos: parametrización, fixtures externos, generación dinámica y separación datos de prueba de la lógica de ejecución.
+description: "Pruebas basadas en datos: parametrización, fixtures externos, generación dinámica y separación datos de prueba de la lógica de ejecución."
 ---
 
 # Data-Driven Testing

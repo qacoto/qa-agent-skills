@@ -1,6 +1,6 @@
 ---
 name: security-testing
-description: Pruebas de seguridad básicas: validación de inputs, autenticación, autorización, headers de seguridad y prevención de vulnerabilidades comunes (XSS, SQL Injection).
+description: "Pruebas de seguridad básicas: validación de inputs, autenticación, autorización, headers de seguridad y prevención de vulnerabilidades comunes (XSS, SQL Injection)."
 ---
 
 # Security Testing

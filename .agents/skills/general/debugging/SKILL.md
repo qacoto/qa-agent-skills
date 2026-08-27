@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: Diagnóstico de fallos con causa raíz: reproducir, clasificar, inspeccionar evidencias (Mochawesome/Allure) y corregir sin enmascarar flakiness.
+description: "Diagnóstico de fallos con causa raíz: reproducir, clasificar, inspeccionar evidencias (Mochawesome/Allure) y corregir sin enmascarar flakiness."
 ---
 
 # Debugging

@@ -1,6 +1,6 @@
 ---
 name: allure
-description: Allure Report como reporter estándar para proyectos mobile Appium Java: dependencias Maven, attachments de evidencias, anotaciones de organización y generación del reporte.
+description: "Allure Report como reporter estándar para proyectos mobile Appium Java: dependencias Maven, attachments de evidencias, anotaciones de organización y generación del reporte."
 ---
 
 # Allure Report

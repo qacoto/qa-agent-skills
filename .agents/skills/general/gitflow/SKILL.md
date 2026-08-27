@@ -1,6 +1,6 @@
 ---
 name: gitflow
-description: Convenciones GitFlow para QA: ramas enfocadas, Conventional Commits y pull requests revisables con evidencia de ejecución.
+description: "Convenciones GitFlow para QA: ramas enfocadas, Conventional Commits y pull requests revisables con evidencia de ejecución."
 ---
 
 # Gitflow

@@ -1,6 +1,6 @@
 ---
 name: appium-java
-description: Automatización mobile con Appium y Java: Screen/Page Objects obligatorios con PageFactory, DriverManager centralizado thread-safe, esperas explícitas e integración Allure.
+description: "Automatización mobile con Appium y Java: Screen/Page Objects obligatorios con PageFactory, DriverManager centralizado thread-safe, esperas explícitas e integración Allure."
 ---
 
 # Appium Java

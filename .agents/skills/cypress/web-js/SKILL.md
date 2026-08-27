@@ -1,6 +1,6 @@
 ---
 name: web-js
-description: Automatización Web con Cypress en JavaScript: Page Object Model obligatorio, selectores estables, sincronización de UI e integración con Mochawesome.
+description: "Automatización Web con Cypress en JavaScript: Page Object Model obligatorio, selectores estables, sincronización de UI e integración con Mochawesome."
 ---
 
 # Cypress Web JS

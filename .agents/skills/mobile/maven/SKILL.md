@@ -1,6 +1,6 @@
 ---
 name: maven
-description: Convenciones Maven para proyectos mobile Appium Java: dependencias explícitas, perfiles por plataforma/entorno, Surefire/Failsafe, properties por CLI y generación del reporte Allure.
+description: "Convenciones Maven para proyectos mobile Appium Java: dependencias explícitas, perfiles por plataforma/entorno, Surefire/Failsafe, properties por CLI y generación del reporte Allure."
 ---
 
 # Maven (Mobile)

@@ -1,6 +1,6 @@
 ---
 name: test-design
-description: Diseño de pruebas basado en riesgo y técnicas formales: partición de equivalencia, valores límite, tablas de decisión, priorización y estrategia de datos de prueba.
+description: "Diseño de pruebas basado en riesgo y técnicas formales: partición de equivalencia, valores límite, tablas de decisión, priorización y estrategia de datos de prueba."
 ---
 
 # Test Design

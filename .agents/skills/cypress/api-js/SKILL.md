@@ -1,6 +1,6 @@
 ---
 name: api-js
-description: Testing de API con Cypress en JavaScript y cy.api()/cy.request(): arquitectura ELD, validación de contratos con JSON Schema, autenticación reutilizable y casos negativos.
+description: "Testing de API con Cypress en JavaScript y cy.api()/cy.request(): arquitectura ELD, validación de contratos con JSON Schema, autenticación reutilizable y casos negativos."
 ---
 
 # Cypress API JS

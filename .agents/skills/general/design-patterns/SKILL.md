@@ -1,6 +1,6 @@
 ---
 name: design-patterns
-description: Patrones de diseño para automatización: Page Object Model obligatorio, Component Objects, Builder/Factory para datos e interfaces fluidas.
+description: "Patrones de diseño para automatización: Page Object Model obligatorio, Component Objects, Builder/Factory para datos e interfaces fluidas."
 ---
 
 # Design Patterns

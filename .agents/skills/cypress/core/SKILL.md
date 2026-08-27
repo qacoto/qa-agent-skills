@@ -1,6 +1,6 @@
 ---
 name: core
-description: Prácticas centrales de Cypress en JavaScript: configuración centralizada, custom commands vs Page Objects, asincronía con alias, sincronización con cy.intercept() y reportería Mochawesome.
+description: "Prácticas centrales de Cypress en JavaScript: configuración centralizada, custom commands vs Page Objects, asincronía con alias, sincronización con cy.intercept() y reportería Mochawesome."
 ---
 
 # Cypress Core

@@ -1,6 +1,6 @@
 ---
 name: cucumber-js
-description: Cypress + Cucumber JavaScript (@badeball/cypress-cucumber-preprocessor): features legibles, step definitions finos delegando a Page Objects, tags y reportería Mochawesome.
+description: "Cypress + Cucumber JavaScript (@badeball/cypress-cucumber-preprocessor): features legibles, step definitions finos delegando a Page Objects, tags y reportería Mochawesome."
 ---
 
 # Cypress Cucumber JS

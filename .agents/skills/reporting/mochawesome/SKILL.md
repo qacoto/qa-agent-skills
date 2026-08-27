@@ -1,6 +1,6 @@
 ---
 name: mochawesome
-description: Mochawesome como reporter estándar para proyectos Cypress (Web y API): configuración, merge de resultados paralelos, evidencias en fallo y publicación como artefacto de CI.
+description: "Mochawesome como reporter estándar para proyectos Cypress (Web y API): configuración, merge de resultados paralelos, evidencias en fallo y publicación como artefacto de CI."
 ---
 
 # Mochawesome
