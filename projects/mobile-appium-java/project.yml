@@ -1,0 +1,18 @@
+name: mobile-appium-java
+agent:
+  - appium-java-agent
+skills:
+  - general/best-practices
+  - general/design-patterns
+  - general/test-design
+  - general/bdd
+  - general/security-testing
+  - general/data-driven-testing
+  - mobile/appium-java
+  - mobile/maven
+  - mobile/cucumber-java
+  - reporting/allure
+rules:
+  - general
+  - coding-standards
+  - testing-standards

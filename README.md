@@ -1,224 +1,223 @@
-# QA Agent Skills
+# QA Agent Skills CLI
 
-Repositorio central de skills para agentes de QA.
+Herramienta y distribución centralizada de agentes, habilidades (_skills_), reglas y perfiles de proyectos de automatización de QA para equipos de ingeniería de calidad.
 
-## Arquitectura
+## Descripción General
 
-```text
-.agents/
-├── skills/
-│   ├── general/
-│   │   ├── design-patterns/
-│   │   ├── best-practices/
-│   │   └── gitflow/
-│   │
-│   ├── automation/
-│   │   ├── cypress/
-│   │   └── appium-java/
-│   │
-│   └── testing/
-│       ├── frontend/
-│       ├── backend/
-│       └── mobile/
-│
-├── agents/
-└── instructions/
-```
+`@qa-team/qa-agent-skills` proporciona una interfaz de línea de comandos (CLI) que permite empaquetar, instalar y actualizar estándares de automatización de pruebas y contextos para agentes de IA en cualquier proyecto consumidora.
 
-## CLI
+> Guía interna para mantener y extender este repositorio: [CONTRIBUTING.md](CONTRIBUTING.md).
 
-La CLI tiene solamente tres comandos, más la versión:
+### Arquitectura del Proyecto
 
-```bash
-qa-skills list
-qa-skills install <skill>
-qa-skills update
-qa-skills --version
-```
+El ecosistema está compuesto por 4 pilares fundamentales:
 
-### Listar
+1. **Agentes (`.agents/agents/`)**: Roles especializados (ej. especialista en Cypress Web, especialista en Appium Java) que guían el comportamiento del asistente de IA.
+2. **Habilidades (`.agents/skills/`)**: Conocimiento técnico reutilizable y mejores prácticas de automatización (ej. Page Object Model obligatorio para UI, separación ELD, Cypress, Appium, Cucumber).
+3. **Reglas (`.agents/rules/`)**: Normas transversales de codificación, estándares de pruebas y principios generales.
+4. **Perfiles de Proyecto (`projects/`)**: Composiciones predefinidas que combinan agentes, habilidades y reglas según el tipo de proyecto de automatización.
 
-```bash
-qa-skills list
-```
+---
 
-Muestra todas las skills disponibles en el repositorio central.
+## Requisitos Previos y Dependencias
 
-### Instalar
+Para consumir e instalar la CLI de `qa-skills`, el entorno debe contar con:
 
-```bash
-qa-skills install cypress
-```
+- **Node.js**: Versión 18.0.0 o superior.
+- **Git**: Instalado y accesible en el `PATH` del sistema.
+- **NPM**: Incluido nativamente con Node.js.
 
-También se pueden instalar varias:
+---
 
-```bash
-qa-skills install cypress frontend gitflow
-```
+## Instalación Global
 
-Cada instalación copia automáticamente las carpetas base desde el
-repositorio central:
-
-```text
-.agents/agents/
-.agents/instructions/
-```
-
-por lo que el proyecto siempre tiene el agente de QA y las instrucciones
-generales. Las skills se copian dentro de:
-
-```text
-.agents/skills/
-```
-
-Si no se quieren las carpetas base:
-
-```bash
-qa-skills install cypress --no-base
-```
-
-Funciona en cualquier tipo de proyecto (Cypress/Node, Java, mobile, etc.),
-ya que solo se copian carpetas Markdown. Por ejemplo, en un proyecto Cypress:
-
-```bash
-qa-skills install cypress frontend gitflow
-```
-
-En un proyecto Java:
-
-```bash
-qa-skills install appium-java backend gitflow
-```
-
-### Consumo por agentes
-
-Las skills instaladas en `.agents/skills/` son detectadas automáticamente por
-agentes de IA (opencode, Claude Code, etc.) cuando trabajan en ese proyecto.
-Cada skill es una carpeta con su `SKILL.md`:
-
-```text
-.agents/skills/automation/cypress/SKILL.md
-```
-
-El agente carga la skill cuando la tarea coincide con su descripción, de modo
-que las reglas de QA viajan con el proyecto y no dependen del contexto de cada
-agente.
-
-### Actualizar
-
-```bash
-qa-skills update
-```
-
-Actualiza solamente las skills que ya existen localmente, y refresca las
-carpetas base (`agents` e `instructions`). Con `--no-base` se omite el
-refrescado de las carpetas base.
-
-Si el repositorio central tiene una skill nueva, `update` NO la instala.
-
-## Prerrequisitos
-
-- Node.js >= 18
-- Git (la CLI clona el repositorio central en segundo plano)
-
-La CLI se necesita únicamente en el momento de instalar. Los proyectos
-consumidores no requieren Node en runtime: las skills son solo carpetas
-Markdown dentro de `.agents/skills/`.
-
-## Instalar la CLI
+La herramienta se distribuye desde la rama estable (`master`) del repositorio Git centralizado. Para instalarla globalmente en tu equipo:
 
 ```bash
 npm install -g git+https://github.com/qacoto/qa-agent-skills.git
 ```
 
-Luego:
+---
 
-```bash
-qa-skills list
-```
+## Uso y Comandos de la CLI
 
-Para ver la versión:
+La CLI ofrece cuatro comandos principales para gestionar perfiles y actualizar el contexto de los agentes de QA en tus proyectos:
 
-```bash
-qa-skills --version
-```
+### 1. `qa-skills list`
 
-## Probar localmente
+Lista todos los perfiles de proyectos y habilidades disponibles en el repositorio central.
 
-Desde este repositorio:
-
-```bash
-npm install -g .
-```
-
-Desde otro proyecto, apuntando a una ruta local del repositorio central:
-
-**Windows**
-
-```bash
-qa-skills list --repo file:///C:/Users/<tu-usuario>/Desktop/qa-agent-skills
-```
-
-**Linux/macOS**
-
-```bash
-qa-skills list --repo file:///ruta/absoluta/qa-agent-skills
-```
-
-Instalar:
-
-```bash
-qa-skills install cypress --repo file:///C:/Users/<tu-usuario>/Desktop/qa-agent-skills
-```
-
-Actualizar:
-
-```bash
-qa-skills update --repo file:///C:/Users/<tu-usuario>/Desktop/qa-agent-skills
-```
-
-También se puede cambiar el repositorio por defecto con la variable de entorno
-`QA_SKILLS_REPO_URL`.
-
-## Comportamiento de update
-
-Si el proyecto tiene:
+**Ejemplo de salida en consola:**
 
 ```text
-.agents/skills/
-├── automation/cypress/
-└── testing/frontend/
+Tipos de proyecto disponibles:
+
+  cypress-api
+  cypress-web
+  cypress-web-cucumber
+  mobile-appium-java
+
+Skills disponibles:
+
+CYPRESS
+  api-js
+  core
+  cucumber-js
+  web-js
+
+GENERAL
+  bdd
+  best-practices
+  data-driven-testing
+  debugging
+  design-patterns
+  gitflow
+  security-testing
+  test-design
+
+MOBILE
+  appium-java
+  cucumber-java
+  maven
+
+REPORTING
+  allure
+  mochawesome
 ```
 
-y el repositorio central agrega:
+---
+
+### 2. `qa-skills install <project-type>`
+
+Instala los agentes, habilidades y reglas correspondientes al perfil seleccionado en la carpeta `.agents/` del proyecto actual y registra la configuración en `.agents/.qa-project.json`.
+
+**Ejemplo de ejecución y salida:**
+
+```bash
+qa-skills install cypress-web
+```
+
+**Salida en consola:**
 
 ```text
-testing/api/
+Tipo de proyecto instalado: cypress-web
 ```
 
-al ejecutar:
+---
+
+### 3. `qa-skills init`
+
+Genera o actualiza el archivo `AGENTS.md` en la raíz del proyecto. `AGENTS.md` sirve como punto de entrada de contexto determinista para los agentes de IA, con secciones reservadas para especificar reglas y particularidades del proyecto consumidor.
+
+**Ejemplo de ejecución y salida:**
+
+```bash
+qa-skills init
+```
+
+**Salida en consola:**
+
+```text
+Generated: AGENTS.md
+```
+
+**Estructura generada en `AGENTS.md`:**
+
+```markdown
+# AGENTS.md
+
+> Generado automáticamente por `qa-skills init`. Actualiza este archivo con la información específica de tu proyecto.
+
+---
+
+## Contexto del Proyecto
+- Nombre del proyecto
+- Descripción
+- Tipo de proyecto
+- Entorno
+
+## Stack Tecnológico
+- Framework principal
+- Lenguaje
+- Gestor de dependencias
+- Base de datos
+- Servicios externos
+
+## Estructura del Repositorio
+- Árbol de directorios
+- Arquitectura ELD
+
+## Cómo Ejecutar el Proyecto
+- Comandos de instalación
+- Comandos de ejecución
+
+## Cómo Ejecutar Tests
+- Comandos de testing
+- Modos de ejecución
+
+## Configuración de Ambientes
+- Variables de entorno
+- Archivos de configuración
+
+## Estrategia de Testing
+- Tipos de pruebas
+- Criterios de aceptación
+
+## Frameworks Utilizados
+- Lista de frameworks
+
+## Convenciones del Proyecto
+- Nomenclatura
+- Convenciones de código
+
+## Patrones Existentes
+- Documentación de patrones
+
+## Reglas Específicas de QA
+- Reglas y estándares
+
+## Datos de Prueba
+- Tipos de datos
+- Gestión de datos
+
+## Dependencias Externas
+- Servicios dependientes
+- APIs Mock
+
+## CI/CD
+- Pipeline
+- Comandos CI
+
+## Reglas para el Agente
+- Instrucciones para el agente de IA
+...
+```
+
+---
+
+### 4. `qa-skills update`
+
+Actualiza únicamente los componentes ya instalados en el proyecto consumidor trayendo la última versión publicada en el repositorio central, respetando la configuración previa en `.agents/.qa-project.json`.
+
+**Ejemplo de ejecución y salida:**
 
 ```bash
 qa-skills update
 ```
 
-solo se actualizarán:
+**Salida en consola:**
 
 ```text
-automation/cypress/
-testing/frontend/
+Actualizado: cypress-web
 ```
 
-`testing/api/` no será instalada.
+---
 
-## Agregar skills
+## Perfiles Disponibles
 
-Para agregar una skill nueva solo hay que crear:
-
-```text
-.agents/skills/<categoria>/<nombre>/SKILL.md
-```
-
-Hacer commit y push.
-
-La CLI la detectará automáticamente.
+| Perfil                 | Tecnologías / Enfoque                          | Reporter      |
+| :--------------------- | :--------------------------------------------- | :------------ |
+| `cypress-web`          | Cypress + JavaScript + Page Object Model (POM) | Mochawesome   |
+| `cypress-api`          | Cypress + `cy.api()` / `cy.request()`          | Mochawesome   |
+| `cypress-web-cucumber` | Cypress + Cucumber (BDD) + POM                 | Mochawesome   |
+| `mobile-appium-java`   | Appium + Java + Maven + Cucumber + POM         | Allure Report |
