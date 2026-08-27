@@ -2,7 +2,7 @@
 const fs=require("fs"), os=require("os"), path=require("path");
 const {execFileSync}=require("child_process");
 const ROOT=process.cwd();
-const DEFAULT_REPO=process.env.QA_SKILLS_REPO_URL||"https://github.com/YOUR-ORG/qa-agent-skills.git";
+const DEFAULT_REPO=process.env.QA_SKILLS_REPO_URL||"https://github.com/qacoto/qa-agent-skills.git";
 const META=path.join(ROOT,".agents",".qa-project.json");
 
 function fail(m){console.error(`\nError: ${m}\n`);process.exit(1)}
