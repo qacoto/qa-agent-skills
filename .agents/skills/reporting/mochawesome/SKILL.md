@@ -1,81 +1,119 @@
 ---
 name: mochawesome
-description: "Mochawesome como reporter estándar para proyectos Cypress (Web y API): configuración, merge de resultados paralelos, evidencias en fallo y publicación como artefacto de CI."
+description: "Configura Mochawesome en Cypress respetando el reporter ya instalado, componiendo setupNodeEvents y preservando evidencias y tasks del proyecto."
 ---
 
 # Mochawesome
 
 ## Propósito
 
-Configurar y operar **Mochawesome**, el reporter estándar obligatorio para todos los proyectos Cypress (Web, API y BDD), generando reportes HTML consolidados con evidencias.
+Generar reportes legibles de Cypress con la variante de Mochawesome que el proyecto consumidor ya utiliza. La configuración debe integrarse con los plugins, tasks y convenciones existentes sin reemplazarlos.
 
 ## Reglas
 
-- Todo proyecto Cypress debe tener Mochawesome configurado en `cypress.config.js`; no se aceptan corridas sin reporte HTML consolidado.
-- Generar JSON individual (`json: true`) y consolidar con `mochawesome-merge` + `marge`: es el flujo estándar para ejecuciones sharded/paralelas.
-- Screenshots automáticos en fallo habilitados (`screenshotOnRunFailure: true`) y adjuntos al reporte.
-- `cypress/results` (o directorio equivalente) publicarse como artefacto de CI incluso cuando la suite falla.
-- Mochawesome aplica **exclusivamente** a ecosistemas JavaScript/Mocha. Para Appium Java usar Allure (ver `reporting/allure`); prohibido forzar Mochawesome fuera de Cypress/Mocha.
+- Inspecciona `package.json`, `cypress.config.js` y el support file antes de modificar reportería.
+- Si existe `cypress-mochawesome-reporter`, usa su plugin y su registro de support; no lo reemplaces por el reporter raw.
+- Si existe `mochawesome` raw, conserva su estrategia actual. Agrega `mochawesome-merge` y `marge` sólo si el proyecto necesita consolidar múltiples JSON.
+- No instales simultáneamente ambas variantes sin una razón documentada.
+- Compón `setupNodeEvents`; preserva tasks DB, preprocessors y otros listeners existentes.
+- Conserva screenshots de fallos y publica el directorio de reportes como artefacto de CI.
+- Usa `cy.step()` o la utilidad de pasos que el consumidor ya tenga para reflejar acciones de negocio.
+- Evita registrar secrets, tokens, credenciales, connection strings o payloads sensibles.
+
+## Estructura recomendada
+
+```text
+cypress/
+  e2e/apis/**/*.cy.js
+  support/e2e.js
+  screenshots/
+  reports/
+cypress.config.js
+package.json
+```
 
 ## Implementación
 
-### Configuración base
+Configuración con `cypress-mochawesome-reporter` y composición de otros eventos:
 
 ```javascript
 // cypress.config.js
+const { defineConfig } = require("cypress");
+
 module.exports = defineConfig({
   screenshotOnRunFailure: true,
-  reporter: "mochawesome",
+  reporter: "cypress-mochawesome-reporter",
   reporterOptions: {
-    overwrite: false,          // un JSON por spec
-    html: false,               // HTML solo tras merge
-    json: true,                // requerido para mochawesome-merge
-    reportDir: "cypress/results",
-    reportPageTitle: "QA Regression Suite"
+    reportDir: "cypress/reports",
+    charts: true,
+    embeddedScreenshots: true,
+    inlineAssets: true,
+    overwrite: false
+  },
+  e2e: {
+    setupNodeEvents(on, config) {
+      require("cypress-mochawesome-reporter/plugin")(on);
+
+      on("task", {
+        safeLog(message) {
+          console.log(String(message));
+          return null;
+        }
+      });
+
+      return config;
+    }
   }
 });
 ```
 
-### Consolidación (local o CI)
+```javascript
+// cypress/support/e2e.js
+require("cypress-mochawesome-reporter/register");
+require("./commands/apis");
+```
+
+Trazabilidad desde un spec data-driven:
+
+```javascript
+Cypress._.each(testData.positivos, (testCase) => {
+  it(testCase.descripcion, () => {
+    cy.step("Consultar el endpoint");
+    cy.getOrders(testCase.query).then((response) => {
+      cy.step("Validar la respuesta");
+      cy.validateStatus(response, testCase.status);
+    });
+  });
+});
+```
+
+Para un proyecto que ya usa `mochawesome` raw y necesita consolidación paralela:
+
+```javascript
+module.exports = defineConfig({
+  reporter: "mochawesome",
+  reporterOptions: {
+    reportDir: "cypress/results",
+    overwrite: false,
+    html: false,
+    json: true
+  }
+});
+```
 
 ```bash
-npx cypress run
-
-# Merge de los JSON generados y render final
-npx mochawesome-merge "cypress/results/*.json" > cypress/results/mochawesome.json
+npx mochawesome-merge "cypress/results/*.json" -o cypress/results/mochawesome.json
 npx marge cypress/results/mochawesome.json --reportDir cypress/results --inline
 ```
 
-Script sugerido para `package.json`:
-
-```json
-{
-  "scripts": {
-    "test": "cypress run",
-    "report:merge": "mochawesome-merge cypress/results/*.json > cypress/results/mochawesome.json",
-    "report:html": "marge cypress/results/mochawesome.json -o cypress/results --inline",
-    "test:report": "npm run test && npm run report:merge && npm run report:html"
-  }
-}
-```
-
-Dependencias dev: `mochawesome`, `mochawesome-merge`, `mochawesome-report-generator` (`marge`).
-
-### Evidencias
-
-- Screenshots en fallo quedan en `cypress/screenshots` y son referenciados por el HTML; conserva ambos artefactos juntos.
-- Videos: útiles en CI; desactívalos en local si ralentizan (`video: false` por defecto en open mode).
-- Nombra tests de forma trazable (`[P0] Checkout – pago aprobado`) para lectura directa del reporte.
-
-### En proyectos Cucumber (BDD)
-
-- Cada escenario aparece como test individual; mantén títulos Gherkin limpios porque son la cara visible del reporte.
-
 ## Anti-patrones prohibidos
 
-- Sobrescribir JSON entre specs (`overwrite: true`) rompiendo el merge.
-- Publicar solo el JSON sin HTML consolidado.
-- Mezclar outputs de distintas corridas sin limpiar `cypress/results` previamente.
+- Reemplazar todo `setupNodeEvents` para registrar el reporter.
+- Instalar paquetes de merge cuando el plugin ya genera el reporte requerido.
+- Mezclar resultados de ejecuciones distintas en un mismo HTML.
+- Publicar sólo datos crudos cuando el pipeline requiere un reporte navegable.
+- Imprimir configuración sensible o cuerpos con secretos en logs y reportes.
+- Forzar Mochawesome fuera de Cypress/Mocha.
 
 ## Contexto Específico del Proyecto
 
