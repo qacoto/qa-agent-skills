@@ -1,120 +1,119 @@
 ---
 name: api-js
-description: "Testing de API con Cypress en JavaScript y cy.api()/cy.request(): arquitectura ELD, validación de contratos con JSON Schema, autenticación reutilizable y casos negativos."
+description: "Diseña suites Cypress API en JavaScript con ELD, testData positivos y negativos, Cypress._.each y comandos reutilizables de negocio."
 ---
 
 # Cypress API JS
 
 ## Propósito
 
-Validar servicios HTTP (estado, headers, body y contratos) con Cypress en JavaScript, aplicando la separación Ejecución / Lógica / Datos y reportería Mochawesome.
+Organizar pruebas HTTP con Cypress y JavaScript sin imponer librerías ni comportamientos que el proyecto consumidor no utiliza. La skill coordina Execution, Logic y Data; delega los requests a comandos API y mantiene las aserciones observables en los specs.
 
 ## Reglas
 
-- Aplica ELD a nivel API:
-  - **Logic**: clientes/servicios que encapsulan endpoints (`OrderApi.get(id)`).
-  - **Data**: builders/fixtures de payloads; nunca payloads literales dentro del spec.
-  - **Execution**: specs que invocan el cliente y asertan el resultado.
-- Usa `cy.api()` cuando el proyecto lo tenga configurado (imprime request/response en el runner); si no, usa `cy.request()`.
-- Nunca hardcodees credenciales ni tokens: resuélvelos vía `Cypress.env()` o `cy.session()`/login por API.
-- Casos negativos: desactiva la falla automática con `failOnStatusCode: false` y aserta explícitamente el código esperado.
-- Valida contratos: cada endpoint cubierto debe validar schema JSON (AJV) además de las reglas de negocio.
+- Lee primero `AGENTS.md`, `cypress.config.js`, los specs, fixtures y comandos existentes.
+- Aplica ELD con las rutas ya adoptadas por el proyecto. Si no existe una convención, usa:
+  - **Execution**: `cypress/e2e/apis/<servicio>/<recurso>/*.cy.js`.
+  - **Logic**: `cypress/support/commands/apis/*.js`.
+  - **Data**: `cypress/fixtures/testdata/apis/<servicio>/<recurso>/*.json`.
+- Declara los datos como `const testData = require(...)` y recorre matrices con `Cypress._.each`.
+- Separa casos positivos y negativos en `testData.positivos` y `testData.negativos` cuando ese patrón exista en el repositorio.
+- Invoca comandos de negocio desde el spec; no construyas `cy.api()` o `cy.request()` directamente en Execution.
+- Usa `failOnStatusCode: false` en Logic para que 4xx/5xx lleguen a las aserciones del caso negativo.
+- Valida al menos status, formato y contenido relevante. Agrega estructura, tipos, headers o tiempos sólo cuando sean parte del comportamiento esperado.
+- No presupongas JSON Schema, OpenAPI, Pact, autenticación, base de datos ni builders. Úsalos únicamente si `AGENTS.md` y el código del consumidor confirman que existen.
+- No conviertas una validación Chai de estructura en “contract testing”. Son estrategias distintas.
 
 ## Estructura recomendada
 
 ```text
 cypress/
-  e2e/api/orders.spec.js      # Execution
-  services/
-    OrderApi.js               # Logic: cliente del endpoint
-    auth.js                   # Lógica de sesión/token
+  e2e/
+    apis/
+      orders/
+        get-orders.cy.js              # Execution
   fixtures/
-    order-payloads.json       # Data estática
+    testdata/
+      apis/
+        orders/
+          get-orders.json             # Data
   support/
-    schema/
-      order.schema.json       # Contrato JSON Schema
+    commands/
+      apis/
+        orders.js                     # Logic
+    e2e.js
 ```
 
 ## Implementación
 
-### Cliente de servicio (capa Logic)
+Datos de prueba:
 
-```javascript
-// cypress/services/OrderApi.js
-class OrderApi {
-  create(payload) {
-    return cy.api({
-      method: "POST",
-      url: "/api/v1/orders",
-      body: payload
-    });
-  }
-
-  getById(id, failOnStatusCode = true) {
-    return cy.request({
-      method: "GET",
-      url: `/api/v1/orders/${id}`,
-      failOnStatusCode
-    });
-  }
+```json
+{
+  "positivos": [
+    {
+      "descripcion": "lista órdenes existentes",
+      "query": { "page": 1 },
+      "status": 200,
+      "formato": "json"
+    }
+  ],
+  "negativos": [
+    {
+      "descripcion": "rechaza un identificador inválido",
+      "query": { "orderId": "INVALID" },
+      "status": 400,
+      "formato": "json",
+      "errorCode": "INVALID_ORDER_ID"
+    }
+  ]
 }
-
-export default new OrderApi();
 ```
 
-### Spec (capa Execution)
+Spec data-driven:
 
 ```javascript
-import OrderApi from "../services/OrderApi";
-import { buildOrder } from "../builders/orderBuilder";
-import orderSchema from "../support/schema/order.schema.json";
+const testData = require("../../../fixtures/testdata/apis/orders/get-orders.json");
 
-it("crea una orden válida", () => {
-  const payload = buildOrder({ items: [{ sku: "SKU-1", qty: 2 }] });
-
-  OrderApi.create(payload).then((res) => {
-    expect(res.status).to.eq(201);
-    cy.wrap(res.body).should("satisfy", (body) => ajv.validate(orderSchema, body));
-    expect(res.body.total).to.eq(payload.expectedTotal);
+describe("GET orders", () => {
+  describe("Casos positivos", () => {
+    Cypress._.each(testData.positivos, (testCase) => {
+      it(testCase.descripcion, () => {
+        cy.step("Consultar órdenes");
+        cy.getOrders(testCase.query).then((response) => {
+          cy.validateStatus(response, testCase.status);
+          cy.validateFormat(response, testCase.formato);
+          expect(response.body).to.be.an("object");
+          expect(response.body.data).to.be.an("array");
+        });
+      });
+    });
   });
-});
 
-it("rechaza una orden sin ítems", () => {
-  const payload = buildOrder({ items: [] });
-
-  OrderApi.create(payload).then((res) => {
-    expect(res.status).to.eq(400);
-    expect(res.body.error.code).to.eq("EMPTY_ORDER");
+  describe("Casos negativos", () => {
+    Cypress._.each(testData.negativos, (testCase) => {
+      it(testCase.descripcion, () => {
+        cy.getOrders(testCase.query).then((response) => {
+          cy.validateStatus(response, testCase.status);
+          cy.validateFormat(response, testCase.formato);
+          expect(response.body.code).to.eq(testCase.errorCode);
+        });
+      });
+    });
   });
 });
 ```
 
-### Autenticación reutilizable
-
-- Prefiere login por API en `before` o custom command con `cy.session()` para cachear la sesión entre tests:
-
-```javascript
-Cypress.Commands.add("apiLogin", (user) =>
-  cy.session(user.email, () => {
-    cy.request("POST", "/api/auth/login", user).its("body.token").as("token");
-  })
-);
-```
-
-### Validación de contratos
-
-- Mantén un JSON Schema por endpoint versionado junto al proyecto.
-- Si existe contrato OpenAPI/Swagger, genera los schemas desde ahí en lugar de duplicarlos a mano.
-
-### Reportería
-
-- Configura Mochawesome según `reporting/mochawesome`; incluye en el nombre del test endpoint + caso para trazabilidad directa en el reporte HTML.
+El comando `cy.getOrders` pertenece a `support/commands/apis`; consulta `cypress/api-commands` para su implementación. Los helpers `validateStatus` y `validateFormat` deben reutilizarse si el consumidor ya los tiene; consulta `cypress/response-validation` para un fallback compatible.
 
 ## Anti-patrones prohibidos
 
-- Specs con URLs crudas y payloads literales repetidos.
-- Aserciones solo sobre el código HTTP sin validar el cuerpo/contrato.
-- Dependencia entre specs (una prueba crea el recurso que consume otra).
+- Agregar AJV, JSON Schema o Pact sólo porque la prueba valida campos del body.
+- Inventar login, tokens, headers o casos 401/403 sin evidencia en el proyecto o la API documentada.
+- Escribir URLs, credenciales, payloads extensos o requests directamente en el spec.
+- Sustituir `testData` y `Cypress._.each` por casos duplicados cuando son la convención del consumidor.
+- Crear dependencias de orden entre tests o usar datos producidos por otro spec.
+- Afirmar únicamente el status en un caso positivo sin inspeccionar la respuesta útil.
 
 ## Contexto Específico del Proyecto
 

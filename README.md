@@ -53,6 +53,7 @@ Lista todos los perfiles de proyectos y habilidades disponibles en el repositori
 Tipos de proyecto disponibles:
 
   cypress-api
+  cypress-api-microservices
   cypress-web
   cypress-web-cucumber
   mobile-appium-java
@@ -60,9 +61,12 @@ Tipos de proyecto disponibles:
 Skills disponibles:
 
 CYPRESS
+  api-commands
   api-js
   core
   cucumber-js
+  oracle-state
+  response-validation
   web-js
 
 GENERAL
@@ -215,9 +219,10 @@ Actualizado: cypress-web
 
 ## Perfiles Disponibles
 
-| Perfil                 | Tecnologías / Enfoque                          | Reporter      |
-| :--------------------- | :--------------------------------------------- | :------------ |
-| `cypress-web`          | Cypress + JavaScript + Page Object Model (POM) | Mochawesome   |
-| `cypress-api`          | Cypress + `cy.api()` / `cy.request()`          | Mochawesome   |
-| `cypress-web-cucumber` | Cypress + Cucumber (BDD) + POM                 | Mochawesome   |
-| `mobile-appium-java`   | Appium + Java + Maven + Cucumber + POM         | Allure Report |
+| Perfil                      | Tecnologías / Enfoque                                                   | Reporter    |
+| :-------------------------- | :---------------------------------------------------------------------- | :---------- |
+| `cypress-web`               | Cypress + JavaScript + Page Object Model (POM)                          | Mochawesome |
+| `cypress-api`               | Cypress API + ELD + `testData` + comandos reutilizables                 | Mochawesome |
+| `cypress-api-microservices` | Cypress API + ELD + comandos API + validación de responses + Oracle DB | Mochawesome |
+| `cypress-web-cucumber`      | Cypress + Cucumber (BDD) + POM                                          | Mochawesome |
+| `mobile-appium-java`        | Appium + Java + Maven + Cucumber + POM                                  | Allure      |
