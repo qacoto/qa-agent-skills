@@ -1,4 +1,4 @@
-name: cypress-api
+name: cypress-api-microservices
 agent:
   - cypress-api-agent
 skills:
@@ -8,6 +8,7 @@ skills:
   - cypress/api-js
   - cypress/api-commands
   - cypress/response-validation
+  - cypress/oracle-state
   - reporting/mochawesome
 rules:
   - general
