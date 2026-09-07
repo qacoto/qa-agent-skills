@@ -8,10 +8,14 @@ skills:
   - general/bdd
   - general/security-testing
   - general/data-driven-testing
+  - general/debugging
+  - mobile/mobile-automation
   - mobile/appium-java
   - mobile/maven
   - mobile/cucumber-java
-  - reporting/allure
+  - mobile/allure-reporting
+  - mobile/appium-debugging
+  - mobile/flaky-test-analysis
 rules:
   - general
   - coding-standards

@@ -1,67 +1,77 @@
 ---
 name: appium-java
-description: "Automatización mobile con Appium y Java: Screen/Page Objects obligatorios con PageFactory, DriverManager centralizado thread-safe, esperas explícitas e integración Allure."
+description: "Automatización mobile con Appium y Java mediante Screen/Page Objects, gestión centralizada del driver, acciones y esperas reutilizables, locators estables y soporte para Android/iOS."
 ---
 
 # Appium Java
 
 ## Propósito
 
-Automatización de apps móviles (Android/iOS) con Appium + Java aplicando Page Object Model obligatorio, gestión centralizada del driver, esperas explícitas y reportería Allure.
+Implementar y mantener automatización de aplicaciones Android e iOS con Appium y Java, preservando separación de responsabilidades, estabilidad, reutilización y compatibilidad con ejecución paralela cuando corresponda.
 
-## Reglas
+Esta skill se enfoca en la capa mobile.
 
-- **POM obligatorio**: cada pantalla es una clase con `@AndroidFindBy` / `@iOSXCUITFindBy` (PageFactory). Los tests/steps nunca usan `driver.findElement()` directamente.
-- **Driver centralizado**: toda sesión se crea vía `DriverManager`/`DriverFactory` (singleton thread-safe con `ThreadLocal<AppiumDriver>`) para soportar ejecución paralela. Prohibido instanciar `AppiumDriver` en tests o screens.
-- **Esperas explícitas** con `WebDriverWait` + `ExpectedConditions`. Prohibido `Thread.sleep()`.
-- Estrategia de locators en orden de prioridad:
-  1. `AppiumBy.accessibilityId()` (estable y accesible).
-  2. `AppiumBy.id()` / `AppiumBy.name()` según plataforma.
-  3. `@AndroidFindBys` / XPath solo como último recurso documentado.
-- Capabilities y URLs del server se leen de propiedades/config centralizados (`-Dplatform=android -Denv=qa`), nunca hardcodeadas en clases.
-- Reportería estándar: **Allure** (ver `reporting/allure`): anotaciones `@Epic/@Feature/@Story/@Severity` y attachments automáticos en fallo.
+El contexto específico del proyecto debe obtenerse de `AGENTS.md`, configuración y código existente.
 
-## Estructura recomendada
+No asumir:
+
+* estructura de módulos;
+* versión concreta de Appium;
+* sistema de reporting;
+* mecanismo de dependency injection;
+* estrategia de paralelismo;
+* nombres de DriverManager o wrappers;
+* plataforma única.
+
+# Arquitectura
+
+Mantener separación entre:
 
 ```text
-src/main/java/app/
-  driver/
-    DriverManager.java     # ThreadLocal + ciclo de vida
-    DriverFactory.java     # capacidades por plataforma
-  pages/
-    LoginScreen.java
-    components/TopBar.java # Component Object
-src/test/java/
-  steps/ runners/ hooks/
-src/test/resources/
-  config.properties        # env, platform, appium server
+Test / Step Definition
+        ↓
+Screen / Page / Flow
+        ↓
+Mobile Actions / Helpers
+        ↓
+Driver abstraction
+        ↓
+Appium
 ```
 
-## Implementación
+Los tests y Step Definitions no deben interactuar directamente con Appium cuando existe una capa mobile que pueda encapsular la operación.
 
-### DriverManager thread-safe
+# Screen Objects
 
-```java
-public class DriverManager {
-    private static final ThreadLocal<AppiumDriver> DRIVER = new ThreadLocal<>();
+Cada pantalla o componente funcional importante debe representarse mediante una abstracción reutilizable.
 
-    public static AppiumDriver getDriver() {
-        if (DRIVER.get() == null) {
-            DRIVER.set(DriverFactory.create());
-        }
-        return DRIVER.get();
-    }
+Puede utilizarse:
 
-    public static void quit() {
-        if (DRIVER.get() != null) {
-            DRIVER.get().quit();
-            DRIVER.remove();
-        }
-    }
-}
-```
+* Screen Object;
+* Page Object;
+* Component Object;
+* Flow Object;
 
-### Screen Object con PageFactory
+según la arquitectura existente.
+
+Los Screens deben encapsular:
+
+* elementos;
+* interacción con elementos;
+* comportamiento propio de la pantalla;
+* sincronización necesaria para operar sobre ella.
+
+No deben contener lógica de negocio ajena a la UI.
+
+## PageFactory
+
+Para este perfil, Appium PageFactory es la estrategia estándar por defecto para Screen/Page Objects.
+
+Usar `@AndroidFindBy`, `@iOSXCUITFindBy`, `@FindBy` y la inicialización definida por el framework del proyecto.
+
+Si un proyecto consumidor ya tiene una arquitectura distinta, establecida y explícita, preservar compatibilidad y no introducir una migración a PageFactory salvo que se solicite.
+
+Ejemplo:
 
 ```java
 public class LoginScreen {
@@ -71,54 +81,332 @@ public class LoginScreen {
     private WebElement usernameField;
 
     @AndroidFindBy(accessibility = "login-button")
+    @iOSXCUITFindBy(accessibility = "login-button")
     private WebElement loginButton;
 
-    @AndroidFindBy(id = "error-message")
-    private WebElement errorMessage;
-
-    public LoginScreen open() {
-        WebDriverWait wait = new WebDriverWait(DriverManager.getDriver(), Duration.ofSeconds(15));
-        wait.until(ExpectedConditions.visibilityOf(usernameField));
-        return this;
-    }
-
-    public HomeScreen loginAs(UserData user) {
-        usernameField.sendKeys(user.getUsername());
-        loginButton.click();
-        return new HomeScreen();
-    }
-
-    public String errorText() {
-        WebDriverWait wait = new WebDriverWait(DriverManager.getDriver(), Duration.ofSeconds(10));
-        wait.until(ExpectedConditions.visibilityOf(errorMessage));
-        return errorMessage.getText();
+    public void login(String username) {
+        actions.type(usernameField, username);
+        actions.tap(loginButton);
     }
 }
 ```
 
-### Gestos y acciones (W3C Actions)
+# Driver
 
-- Swipe/scroll/tap long encapsulados en métodos del Screen Object usando `PointerInput`/`Sequence` o utilidades propias; nunca inline en los tests.
-- Scroll hasta elemento: `scrollIntoView` de UiSelector (Android) o `mobile: scroll` (iOS) dentro del screen correspondiente.
+La creación y destrucción de sesiones Appium debe estar centralizada.
 
-### Ciclo de vida de la app
+Ejemplo conceptual:
 
-- Define explícitamente `noReset`/`fullReset` por entorno en `config.properties`; los datos sembrados se gestionan por API/backend cuando sea posible.
-- Deep links (`deep-link://...`) preferidos sobre navegación manual por UI para Given de contexto.
+```text
+DriverManager
+      ↓
+DriverFactory
+      ↓
+AndroidDriver / IOSDriver
+```
 
-## Anti-patrones prohibidos
+No crear drivers directamente desde:
 
-- Locators XPath absolutos (`/hierarchy/android.widget.Frame[0]/...`).
-- Un driver global compartido sin ThreadLocal (rompe paralelismo).
-- Waits implícitos globales combinados con explícitos (degradan determinismo).
-- Lógica de negocio dentro de las Screens (eso vive en servicios/capa Logic).
+* tests;
+* Step Definitions;
+* Screen Objects.
 
-## Contexto Específico del Proyecto
+Preferir:
 
-<!--
-LLM_CONTEXT_START
+```java
+DriverManager.getDriver();
+```
 
-Project-specific facts belong in the consuming project's AGENTS.md.
+o la abstracción equivalente definida por el proyecto.
 
-LLM_CONTEXT_END
--->
+# Paralelismo
+
+Cuando el proyecto soporte ejecución paralela, cada ejecución debe tener una sesión de driver aislada.
+
+Una estrategia habitual en Java es:
+
+```java
+private static final ThreadLocal<AppiumDriver> DRIVER =
+    new ThreadLocal<>();
+```
+
+pero debe respetarse la estrategia definida por el framework.
+
+Nunca compartir una instancia mutable de driver entre ejecuciones paralelas.
+
+Evitar también estado global mutable asociado a:
+
+* plataforma;
+* usuario;
+* dispositivo;
+* escenario;
+* datos temporales.
+
+# Configuración
+
+Capabilities, dispositivos, plataforma, aplicaciones, URLs y entorno deben obtenerse de configuración externa.
+
+Ejemplos:
+
+```text
+-Dmobile.platform=android
+-Dmobile.driver.url=http://127.0.0.1:4723/
+-Dandroid.app.path=/path/to/app.apk
+-Dios.app.path=/path/to/app.app
+-Denv=qa
+```
+
+o:
+
+```text
+environment variables
+properties
+yaml
+json
+CI variables
+```
+
+No hardcodear configuración de ejecución dentro de Screens o tests.
+
+Especialmente evitar hardcodear:
+
+* UDID;
+* URL de Appium;
+* rutas personales;
+* device name;
+* app path;
+* credenciales;
+* environment.
+
+# Locators
+
+Priorizar locators estables y orientados a accesibilidad.
+
+Orden orientativo:
+
+1. accessibility identifier estable;
+2. resource-id / id estable;
+3. identificadores nativos equivalentes;
+4. estrategias específicas de plataforma;
+5. XPath únicamente cuando no exista alternativa razonable.
+
+La estrategia concreta depende de la aplicación y plataforma.
+
+No utilizar XPath absoluto generado desde la jerarquía completa.
+
+Ejemplo a evitar:
+
+```text
+/hierarchy/android.widget.FrameLayout[1]/...
+```
+
+Cuando un elemento carezca de identificador estable y esto comprometa la automatización, considerar solicitar un accessibility identifier o test identifier al equipo de desarrollo.
+
+# Android E iOS
+
+Cuando el comportamiento funcional sea común, mantener una abstracción compartida siempre que sea razonable.
+
+Ejemplo con PageFactory:
+
+```java
+@AndroidFindBy(accessibility = "login-button")
+@iOSXCUITFindBy(accessibility = "login-button")
+private WebElement loginButton;
+```
+
+Cuando las plataformas requieran comportamientos significativamente diferentes, encapsular la diferencia dentro de la capa mobile.
+
+Evitar propagar condicionales como:
+
+```java
+if (platform.equals("android")) {
+    ...
+} else {
+    ...
+}
+```
+
+por tests y Step Definitions.
+
+# Mobile Actions
+
+Centralizar operaciones repetitivas en una capa de acciones cuando el framework la tenga o cuando la duplicación lo justifique.
+
+Ejemplos:
+
+```text
+tap
+type
+clear
+waitUntilVisible
+waitUntilClickable
+scroll
+swipe
+longPress
+hideKeyboard
+getText
+isDisplayed
+```
+
+Modelo recomendado:
+
+```text
+Screen
+   ↓
+MobileActions
+   ↓
+AppiumDriver
+```
+
+Esto evita repetir lógica técnica entre Screens.
+
+# Esperas
+
+Utilizar sincronización explícita basada en condiciones.
+
+Preferir:
+
+```text
+elemento visible
+elemento clickable
+elemento presente
+pantalla cargada
+estado esperado
+```
+
+sobre esperas temporales arbitrarias.
+
+Evitar:
+
+```java
+Thread.sleep(5000);
+```
+
+No combinar indiscriminadamente implicit waits elevados con explicit waits.
+
+Los timeouts deben estar centralizados o configurables cuando sea posible.
+
+# Gestos
+
+Encapsular gestos mobile en Screens o utilidades reutilizables.
+
+Ejemplos:
+
+* swipe;
+* scroll;
+* long press;
+* drag and drop;
+* tap por posición cuando sea estrictamente necesario.
+
+Preferir APIs compatibles con la versión actual de Appium.
+
+No introducir implementaciones inline repetidas en tests o steps.
+
+Las estrategias específicas de Android o iOS deben permanecer dentro de la capa mobile.
+
+# Coordenadas
+
+Evitar coordenadas cuando exista un locator estable.
+
+Cuando sean necesarias por limitaciones reales de la aplicación o plataforma:
+
+* encapsularlas;
+* calcularlas relativamente al elemento o viewport cuando sea posible;
+* documentar la razón;
+* evitar valores mágicos distribuidos por el código.
+
+# Ciclo De Vida De La Aplicación
+
+Las operaciones como:
+
+```text
+activateApp
+terminateApp
+reset
+background
+reinstall
+```
+
+deben realizarse mediante abstracciones reutilizables.
+
+La elección entre conservar o limpiar estado debe estar definida por la estrategia de ejecución del proyecto.
+
+No asumir `noReset` o `fullReset` globalmente.
+
+# Datos Y Precondiciones
+
+Cuando una precondición pueda prepararse de forma más estable mediante APIs, servicios o fixtures, evaluar esa alternativa en lugar de realizar navegación UI innecesaria.
+
+Sin embargo, no saltarse por API o deep link el comportamiento que constituye el objetivo del escenario.
+
+# Evidencias
+
+La captura de evidencias debe centralizarse.
+
+Ejemplos:
+
+* screenshots;
+* page source;
+* logs;
+* información del dispositivo.
+
+Evitar repetir screenshots manuales en cada test o step.
+
+Si el proyecto utiliza Allure u otro reporter, delegar la implementación específica a su configuración o skill correspondiente.
+
+# Antes De Crear Código
+
+Antes de implementar una nueva interacción:
+
+1. Revisar Screen Objects existentes.
+2. Buscar locators reutilizables.
+3. Buscar acciones equivalentes en wrappers/helpers.
+4. Revisar estrategia de waits.
+5. Revisar diferencias Android/iOS.
+6. Revisar DriverManager/DriverFactory.
+7. Revisar configuración existente.
+8. Revisar convenciones en `AGENTS.md`.
+
+Priorizar reutilización sobre creación de nuevas abstracciones.
+
+# Anti-patrones
+
+No:
+
+* utilizar `driver.findElement()` directamente desde tests o Step Definitions;
+* crear drivers fuera de la capa responsable;
+* utilizar `Thread.sleep`;
+* utilizar XPath absolutos;
+* duplicar gestos y waits;
+* hardcodear capabilities;
+* hardcodear rutas locales;
+* compartir drivers entre ejecuciones paralelas;
+* introducir lógica de negocio compleja en Screens;
+* propagar detalles específicos Android/iOS hacia tests;
+* utilizar coordenadas cuando existe un locator estable;
+* duplicar helpers existentes.
+
+# Contexto Específico Del Proyecto
+
+La siguiente información debe obtenerse del proyecto consumidor:
+
+```text
+- versión de Java;
+- versión de Appium;
+- versión del Appium Java Client;
+- arquitectura de módulos;
+- Screen/Page Object strategy;
+- PageFactory si aplica;
+- DriverManager/DriverFactory;
+- wrappers y MobileActions;
+- timeouts;
+- capabilities;
+- plataformas;
+- dispositivos;
+- reporting;
+- estrategia de paralelismo;
+- rutas de aplicaciones;
+- configuración CI/CD.
+```
+
+Esta skill no debe asumir valores específicos para ninguno de estos elementos.

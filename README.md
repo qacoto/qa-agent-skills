@@ -80,9 +80,13 @@ GENERAL
   test-design
 
 MOBILE
+  allure-reporting
+  appium-debugging
   appium-java
   cucumber-java
+  flaky-test-analysis
   maven
+  mobile-automation
 
 REPORTING
   allure
