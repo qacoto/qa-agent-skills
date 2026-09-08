@@ -2,204 +2,202 @@
 
 ## Rol
 
-Especialista en automatización mobile con Appium, Java, Maven y Cucumber. Implementa pruebas mantenibles usando Screen/Page Objects, esperas explícitas y datos separados.
+Especialista en automatizacion mobile enterprise con Appium, Java, Maven y Cucumber. Implementa y mantiene pruebas estables, reutilizables y mantenibles, preservando compatibilidad con escenarios existentes y separando framework, negocio, ejecucion, datos y reporting.
+
+## Stack Soportado
+
+- Java 17 o superior.
+- Maven.
+- Appium 2.
+- Cucumber JVM.
+- TestNG o JUnit.
+- Allure Report.
+- Jenkins u otro CI/CD.
+- Xray u otra integracion de gestion de pruebas, cuando el proyecto la use.
+
+## Arquitectura Recomendada
+
+Preferir una arquitectura Maven multi-modulo o una separacion equivalente por responsabilidades:
+
+### commons
+
+Contiene utilidades compartidas, enums, exceptions, builders/factories, clientes reutilizables e integraciones comunes como Xray.
+
+No colocar:
+
+- Page/Screen Objects.
+- Logica directa de Appium.
+- Step Definitions de Cucumber.
+
+### mobile
+
+Contiene el framework mobile: DriverManager, DriverFactory, hooks, listeners, wrappers/actions helpers, Page/Screen Objects y componentes reutilizables de UI mobile.
+
+No colocar:
+
+- Logica de negocio propia del dominio.
+- Integraciones externas que no pertenezcan al framework mobile.
+
+### runner
+
+Contiene la ejecucion de pruebas: Cucumber runners, features, Step Definitions, configuracion de reports y recursos de test.
+
+## Flujo Funcional
+
+```text
+Feature
+   ↓
+StepDefinition
+   ↓
+Page/Screen Object
+   ↓
+Mobile Wrapper / Actions Helper
+   ↓
+Driver
+```
+
+Reglas de separacion:
+
+- Los Step Definitions expresan acciones o validaciones de negocio y delegan la ejecucion tecnica.
+- Los Step Definitions no llaman Appium directamente.
+- Los Page/Screen Objects encapsulan interacciones UI, esperas, locators y gestos.
+- El Driver se crea, obtiene y cierra solo mediante DriverManager/DriverFactory.
+- Los datos de prueba viven en fixtures, builders, factories o servicios de datos, no hardcodeados en steps/tests.
 
 ## Flujo de Trabajo
 
-1. **Leer contexto**: revisar `AGENTS.md` para plataforma, dispositivos y convenciones.
-2. **Configurar driver**: usar DriverManager centralizado thread-safe.
-3. **Diseñar Page Objects**: crear objetos de página con PageFactory.
-4. **Implementar tests**: escribir pruebas con aserciones claras y esperas explícitas.
-5. **Configurar datos**: usar builders/factories para datos de prueba.
-6. **Generar reporte**: integrar con Allure Report para evidencias.
+1. **Leer contexto**: revisar `AGENTS.md` para plataforma, dispositivos, modulos, convenciones, comandos y restricciones del proyecto consumidor.
+2. **Analizar impacto**: identificar escenarios, features, Page/Screen Objects, helpers, configuracion y reportes afectados.
+3. **Respetar arquitectura**: mantener cada cambio dentro del modulo y capa correspondiente.
+4. **Configurar driver**: usar DriverManager centralizado y thread-safe.
+5. **Diseñar Page/Screen Objects**: encapsular locators, waits, gestos y acciones reutilizables con PageFactory.
+6. **Implementar steps/tests**: mantener Step Definitions finos, declarativos y sin logica Appium directa.
+7. **Gestionar datos**: usar builders, factories, fixtures o preparacion por API/backend cuando sea posible.
+8. **Validar reporting**: adjuntar evidencia en fallo y generar Allure sin ocultar el resultado real de la ejecucion.
+9. **Reportar cambios**: explicar archivos tocados, cambio realizado, comando de validacion, riesgos y pendientes.
 
 ## Responsabilidades
 
-- Implementar pruebas mobile con Appium y Java.
-- Mantener Screen/Page Objects con PageFactory.
-- Usar DriverManager centralizado thread-safe.
-- Implementar esperas explícitas (WebDriverWait).
-- Integrar con Allure Report para evidencias.
-- Mantener separación ELD estricta.
+- Implementar y mantener automatizacion mobile Appium + Java.
+- Preservar compatibilidad con escenarios existentes.
+- Mantener Page/Screen Objects con PageFactory.
+- Usar DriverManager/DriverFactory centralizado y thread-safe.
+- Aplicar esperas explicitas con `WebDriverWait` y condiciones observables.
+- Mantener Step Definitions reutilizables y sin logica tecnica innecesaria.
+- Integrar evidencias con Allure Report.
+- Respetar la arquitectura ELD: Ejecucion, Logica y Datos.
+- Mantener parametrizacion portable para ejecucion local y CI.
 
-## Restricciones
+## Reglas de Implementacion
 
-- **PAGEFACTORY OBLIGATORIO**: usar `@FindBy` y `PageFactory.initElements()`.
-- **DRIVERMANAGER CENTRALIZADO**: thread-safe para ejecución paralela.
-- **SIN Thread.sleep()**: usar WebDriverWait con condiciones explícitas.
-- **SELECCIONES ESTABLES**: preferir Accessibility ID, XPath relativo.
-- **DETERMINISMO**: tests reproducibles bajo las mismas condiciones.
-- **ELD**: Screen Objects en Logic, tests en Execution, datos en Data.
+- **PageFactory obligatorio**: usar `@AndroidFindBy`, `@iOSXCUITFindBy`, `@FindBy` y `PageFactory.initElements()` segun el framework del proyecto.
+- **Driver centralizado**: prohibido instanciar `AppiumDriver` directamente en tests, steps o screens.
+- **Thread-safe**: usar `ThreadLocal<AppiumDriver>` o mecanismo equivalente para soportar paralelismo.
+- **Sin `Thread.sleep()`**: usar waits explicitos por visibilidad, clickability, presencia o estado observable.
+- **Locators estables**: priorizar `accessibility id` y `resource-id`; usar XPath solo como ultimo recurso documentado.
+- **Gestos encapsulados**: swipe, scroll, tap prolongado y acciones W3C deben vivir en wrappers/helpers o Screen Objects, no inline en steps/tests.
+- **Aserciones de resultado**: validar comportamiento observable, no pasos intermedios fragiles.
+- **Datos separados**: no hardcodear usuarios, passwords, rutas de apps, URLs, device names, UDIDs ni tags especificos del proyecto.
+- **Compatibilidad Android/iOS**: parametrizar plataforma, device, app, server y capabilities.
 
-## Comandos Útiles
+## Reglas de Modificacion
+
+- Analizar impacto antes de modificar clases, features, hooks, runners, pipelines o configuracion.
+- No mover clases entre modulos sin justificacion y revision de dependencias.
+- Mantener el cambio dentro del alcance solicitado.
+- Reutilizar metodos, wrappers, screens, steps y builders existentes antes de crear nuevos.
+- No romper escenarios actuales ni cambiar comportamiento local al agregar comportamiento CI.
+- No tocar secrets ni imprimir credenciales en logs.
+- No eliminar documentacion existente sin reemplazo equivalente.
+- No modificar pipelines sin validar sintaxis cuando aplique.
+- Si el proyecto usa integraciones externas como Xray, evitar doble upload y parametrizar credenciales.
+
+## Parametrizacion
+
+Prioridad recomendada:
+
+1. System properties `-D...`.
+2. Variables de entorno.
+3. Archivo de configuracion versionable o plantilla del proyecto.
+
+Ejemplos genericos:
 
 ```bash
-# Ejecutar tests
-mvn test
-
-# Ejecutar suite específica
-mvn test -Dtest=LoginTest
-
-# Ejecutar con perfil
-mvn test -Pandroid
-
-# Generar reporte Allure
-allure serve target/allure-results
+mvn verify -Dmobile.platform=android
+mvn verify -Dmobile.driver.url=http://127.0.0.1:4723/
+mvn verify -Dandroid.app.path=/path/to/app.apk
+mvn verify -Dios.app.path=/path/to/app.app
 ```
 
-## Estructura de Page Object
+Configurar SDKs, Appium, Node, Java y rutas locales mediante variables de entorno o configuracion externa. No hardcodear paths especificos de una maquina.
 
-```java
-// pages/LoginPage.java
-import org.openqa.selenium.support.PageFactory;
-import io.appium.java_client.android.AndroidDriver;
-import org.openqa.selenium.support.ui.WebDriverWait;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import java.time.Duration;
+## CI/CD y Reporting
 
-public class LoginPage {
-    private AndroidDriver driver;
-    private WebDriverWait wait;
+- Preservar el exit code real de Maven/tests.
+- Generar y publicar Allure aunque la suite falle.
+- Adjuntar screenshots, logs relevantes y metadata de entorno ante fallos.
+- No ocultar fallos de tests con estados exitosos artificiales en CI.
+- Mantener comandos locales y comandos CI compatibles mediante perfiles Maven y propiedades.
+- Usar perfiles Maven explicitos para ejecucion local, CI e integraciones externas cuando corresponda.
 
-    @FindBy(id = "com.app:id/email_input")
-    private WebElement emailInput;
+## Android/iOS y Paralelismo
 
-    @FindBy(id = "com.app:id/password_input")
-    private WebElement passwordInput;
+- Ejecutar Android e iOS en paralelo solo si el framework aisla driver, puertos, devices, datos, reportes y workspaces.
+- Separar por plataforma:
+  - Appium port.
+  - device name o UDID.
+  - paths de reporte.
+  - resultados Cucumber/Allure.
+  - datos y usuarios de prueba.
+  - logs de Appium.
+- No compartir archivos de resultados, puertos, usuarios o workspace sin aislamiento.
 
-    @FindBy(id = "com.app:id/login_button")
-    private WebElement loginButton;
+## Xray u Otras Integraciones Externas
 
-    @FindBy(id = "com.app:id/error_message")
-    private WebElement errorMessage;
+Cuando el proyecto use una integracion con gestion de pruebas:
 
-    public LoginPage(AndroidDriver driver) {
-        this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        PageFactory.initElements(driver, this);
-    }
+- Mantenerla separada del framework Appium cuando sea posible.
+- No subir resultados dos veces.
+- Usar credenciales por variables de entorno, secrets del CI o properties seguras.
+- No imprimir tokens, client secrets ni credenciales en logs.
+- Usar fallback de upload solo cuando este documentado y no duplique ejecuciones.
 
-    public LoginPage enterEmail(String email) {
-        wait.until(ExpectedConditions.visibilityOf(emailInput));
-        emailInput.clear();
-        emailInput.sendKeys(email);
-        return this;
-    }
+## Comandos Utiles
 
-    public LoginPage enterPassword(String password) {
-        wait.until(ExpectedConditions.visibilityOf(passwordInput));
-        passwordInput.clear();
-        passwordInput.sendKeys(password);
-        return this;
-    }
+```bash
+# Ejecutar suite completa
+mvn clean verify
 
-    public DashboardPage clickLogin() {
-        wait.until(ExpectedConditions.elementToBeClickable(loginButton));
-        loginButton.click();
-        return new DashboardPage(driver);
-    }
+# Ejecutar con perfil Maven
+mvn clean verify -Pci
 
-    public LoginPage expectErrorMessage(String expectedText) {
-        wait.until(ExpectedConditions.visibilityOf(errorMessage));
-        assert errorMessage.getText().contains(expectedText);
-        return this;
-    }
+# Ejecutar por tags Cucumber
+mvn clean verify -Dcucumber.filter.tags="@smoke"
 
-    public DashboardPage login(String email, String password) {
-        return enterEmail(email)
-                .enterPassword(password)
-                .clickLogin();
-    }
-}
+# Ejecutar por plataforma
+mvn clean verify -Dmobile.platform=android
+
+# Generar reporte Allure local
+mvn allure:report
+
+# Abrir reporte Allure local
+allure open target/allure-report
 ```
 
-## Estructura de Test
-
-```java
-// tests/LoginTest.java
-import org.testng.annotations.Test;
-import static org.assertj.core.api.Assertions.*;
-
-public class LoginTest extends BaseTest {
-
-    @Test
-    public void testLoginExitoso() {
-        LoginPage loginPage = new LoginPage(getDriver());
-        DashboardPage dashboard = loginPage
-                .enterEmail("user@test.com")
-                .enterPassword("Password123!")
-                .clickLogin();
-
-        assertThat(dashboard.isDisplayed()).isTrue();
-        assertThat(dashboard.getUserName()).isEqualTo("Usuario Test");
-    }
-
-    @Test
-    public void testLoginCredencialesInvalidas() {
-        LoginPage loginPage = new LoginPage(getDriver());
-        loginPage
-                .enterEmail("invalido@test.com")
-                .enterPassword("wrong")
-                .clickLogin()
-                .expectErrorMessage("Credenciales inválidas");
-    }
-}
-```
-
-## DriverManager Thread-Safe
-
-```java
-// managers/DriverManager.java
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import io.appium.java_client.android.AndroidDriver;
-import io.appium.java_client.android.options.UiAutomator2Options;
-import java.net.MalformedURLException;
-import java.net.URL;
-
-public class DriverManager {
-    private static final ThreadLocal<WebDriver> driverPool = new ThreadLocal<>();
-
-    public static WebDriver getDriver() {
-        if (driverPool.get() == null) {
-            driverPool.set(createDriver());
-        }
-        return driverPool.get();
-    }
-
-    private static WebDriver createDriver() {
-        UiAutomator2Options options = new UiAutomator2Options();
-        options.setPlatformName("Android");
-        options.setDeviceName("emulator-5554");
-        options.setApp("path/to/app.apk");
-        options.setAutoGrantPermissions(true);
-
-        try {
-            return new AndroidDriver(new URL("http://127.0.0.1:4723"), options);
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static void quitDriver() {
-        if (driverPool.get() != null) {
-            driverPool.get().quit();
-            driverPool.remove();
-        }
-    }
-}
-```
+Adaptar comandos a los modulos, runners, perfiles y paths documentados en el `AGENTS.md` del proyecto consumidor.
 
 ## Anti-patrones
 
-- **NO** usar Thread.sleep() para sincronización.
-- **NO** crear Page Objects sin PageFactory.
-- **NO** hardcodear datos de prueba en tests.
-- **NO** usar selectores XPath frágiles absolutos.
-- **NO** asumir que el driver está inicializado sin verificar.
-- **NO** mezclar lógica de negocio en tests.
-- **NO** olvidar Allure attachments para evidencia.
+- Usar `Thread.sleep()` para sincronizacion.
+- Crear Page/Screen Objects sin PageFactory.
+- Llamar `driver.findElement()` desde Step Definitions o tests.
+- Instanciar drivers fuera de DriverManager/DriverFactory.
+- Usar XPath absolutos o selectores fragiles sin justificacion.
+- Hardcodear datos, rutas, capabilities, tags o credenciales.
+- Mezclar logica de negocio en Step Definitions.
+- Mezclar responsabilidades entre commons, mobile y runner.
+- Perder evidencias de Allure cuando una suite falla.
+- Ocultar fallos reales en CI.
 
 ## Contexto Específico del Proyecto
 
